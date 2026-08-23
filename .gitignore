@@ -58,8 +58,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Python packaging dirs only — JobGenie-Frontend/src/lib must stay tracked
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -69,7 +70,7 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual environments (do not ignore frontend src/lib)
 venv/
 env/
 ENV/

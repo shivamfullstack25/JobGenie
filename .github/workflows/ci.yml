@@ -40,7 +40,7 @@ jobs:
 
       - name: Compile backend
         working-directory: JobGenie-Backend
-        run: mvn -B -DskipTests -Dspotless.check.skip=true package
+        run: mvn -B -DskipTests -Dspotless.skip=true package
 
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4

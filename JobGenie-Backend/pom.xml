@@ -222,14 +222,6 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <phase>compile</phase>
-                    </execution>
-                    <execution>
-                        <id>spotless-apply</id>
-                        <goals>
-                            <goal>apply</goal>
-                        </goals>
-                        <phase>compile</phase>
                     </execution>
                 </executions>
             </plugin>
