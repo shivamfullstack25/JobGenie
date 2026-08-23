@@ -1,0 +1,379 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jobgenie_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobgenie_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-jobgenie_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobgenie_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobgenie-network
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobgenie-network
+
+  eureka-server:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: eureka-server/Dockerfile
+    restart: always
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on: []
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+    networks:
+      - jobgenie-network
+
+  job-service:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: job-service/Dockerfile
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_jobs
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-jobgenie_pass}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      RESUME_SERVICE_URL: ${RESUME_SERVICE_URL:-http://resume-service:8083}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+    networks:
+      - jobgenie-network
+
+  user-service:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: user-service/Dockerfile
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_users
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-jobgenie_pass}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      # Firebase Configuration
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
+      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID}
+      FIREBASE_SERVICE_ACCOUNT_KEY: ${FIREBASE_SERVICE_ACCOUNT_KEY:-/app/secrets/firebase-service-account.json}
+      SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+      - ./app/secrets:/app/secrets:ro
+    networks:
+      - jobgenie-network
+
+  resume-service:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: resume-service/Dockerfile
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_resumes
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-jobgenie_pass}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+    networks:
+      - jobgenie-network
+
+  notification-service:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: notification-service/Dockerfile
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_notifications
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-jobgenie_pass}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+    networks:
+      - jobgenie-network
+
+  ai-service:
+    build: 
+      context: ./JobGenie-AI
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      # Core AI Configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
+      
+      # AI Service Features
+      ENABLE_VECTOR_STORAGE: ${ENABLE_VECTOR_STORAGE:-false}
+      ENABLE_MEMORY: ${ENABLE_MEMORY:-true}
+      ENABLE_STREAMING: ${ENABLE_STREAMING:-true}
+      
+      # Vector Database
+      VECTOR_DB_TYPE: ${VECTOR_DB_TYPE:-chromadb}
+      VECTOR_DB_PATH: ${VECTOR_DB_PATH:-/app/data/vectordb}
+      VECTOR_STORE_PERSIST_DIR: ${VECTOR_STORE_PERSIST_DIR:-/app/vector_db}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-ada-002}
+      VECTOR_DIMENSION: ${VECTOR_DIMENSION:-1536}
+      
+      # Memory Management
+      MEMORY_PROVIDER: ${MEMORY_PROVIDER:-redis}
+      MEMORY_TTL: ${MEMORY_TTL:-3600}
+      MEMORY_K: ${MEMORY_K:-10}
+      CONTEXT_WINDOW: ${CONTEXT_WINDOW:-4000}
+      MAX_CONTEXT_LENGTH: ${MAX_CONTEXT_LENGTH:-4000}
+      
+      # Browser Automation
+      HEADLESS_BROWSER: ${HEADLESS_BROWSER:-false}
+      AUTO_APPLY_ENABLED: ${AUTO_APPLY_ENABLED:-false}
+      MAX_CONCURRENT_APPLICATIONS: ${MAX_CONCURRENT_APPLICATIONS:-5}
+      BROWSER_TIMEOUT: ${BROWSER_TIMEOUT:-30000}
+      
+      # Database and Redis
+      POSTGRES_URL: ${POSTGRES_URL:-postgresql://jobgenie_user:jobgenie_pass@postgres:5432/jobgenie_ai}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      
+      # Service Discovery
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      SERVICE_NAME: ${SERVICE_NAME:-ai-service}
+      SERVICE_PORT: ${SERVICE_PORT:-8000}
+      
+      # Firebase Configuration
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
+      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID}
+      
+      # Email Configuration
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      
+      # Advanced Features
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED:-true}
+      ENABLE_PERFORMANCE_MONITORING: ${ENABLE_PERFORMANCE_MONITORING:-true}
+      ENABLE_REAL_TIME_ANALYTICS: ${ENABLE_REAL_TIME_ANALYTICS:-true}
+      
+      # Security and Performance
+      RATE_LIMIT_REPLENISH: ${RATE_LIMIT_REPLENISH:-10}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+      JOB_SEARCH_MAX_RESULTS: ${JOB_SEARCH_MAX_RESULTS:-50}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10MB}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      
+      # Development
+      DEBUG: ${DEBUG:-false}
+      RELOAD: ${RELOAD:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    volumes:
+      - ai-data:/app/vector_db
+      - ai-logs:/app/logs
+      - ai-cache:/app/cache
+      - ai-vectordb:/app/data/vectordb
+    networks:
+      - jobgenie-network
+
+  api-gateway:
+    build:
+      context: ./JobGenie-Backend
+      dockerfile: api-gateway/Dockerfile
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+      USER_SERVICE_URL: http://user-service:8081
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      job-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      resume-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_started
+      ai-service:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    volumes:
+      - maven-cache:/root/.m2/repository
+    networks:
+      - jobgenie-network
+
+  frontend:
+    build: 
+      context: ./JobGenie-Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8000}
+    restart: always
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+      VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - jobgenie-network
+
+volumes:
+  pgdata:
+  maven-cache:
+  ai-data:
+  ai-logs:
+  ai-cache:
+  ai-vectordb:
+
+networks:
+  jobgenie-network:
+    driver: bridge 

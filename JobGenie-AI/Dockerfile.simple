@@ -1,0 +1,61 @@
+# Use Python 3.11 with a more complete base image
+FROM python:3.11-bullseye
+
+# Set working directory
+WORKDIR /app
+
+# Update package lists and install system dependencies with retry logic
+RUN apt-get update --fix-missing || (sleep 10 && apt-get update --fix-missing) && \
+    apt-get install -y --no-install-recommends \
+    # Build tools for compiling dependencies
+    gcc \
+    g++ \
+    make \
+    # Basic utilities
+    wget \
+    curl \
+    unzip \
+    # Vector storage dependencies
+    libopenblas-dev \
+    liblapack-dev \
+    gfortran \
+    # Additional utilities
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements-minimal.txt requirements.txt
+
+# Install Python dependencies with optimization flags
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+# Install dependencies with retry logic and multiple mirrors
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel --timeout 600 --retries 3 && \
+    pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 3 --index-url https://pypi.org/simple/ --trusted-host pypi.org --trusted-host files.pythonhosted.org
+
+# Create directories for vector storage and data persistence
+RUN mkdir -p /app/vector_db /app/data /app/logs /app/cache
+
+# Copy application code
+COPY . .
+
+# Set permissions for data directories
+RUN chmod -R 755 /app/vector_db /app/data /app/logs /app/cache
+
+# Create non-root user for security
+RUN useradd -m -u 1000 jobgenie && \
+    chown -R jobgenie:jobgenie /app
+USER jobgenie
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application with optimized startup script
+CMD ["./startup.sh"] 

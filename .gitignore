@@ -1,0 +1,405 @@
+# =========================================================
+# JobGenie - Comprehensive .gitignore
+# =========================================================
+
+# =========================================================
+# 🔒 SENSITIVE & ENVIRONMENT FILES
+# =========================================================
+.env
+.env.local
+.env.production
+.env.staging
+*.key
+*.pem
+**/firebase-service-account.json
+
+# Keep the secrets directory structure but ignore sensitive files
+app/secrets/*
+!app/secrets/.gitkeep
+**/secrets/
+
+# =========================================================
+# ☕ JAVA / SPRING BOOT
+# =========================================================
+# Maven
+target/
+**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Class files
+*.class
+*.jar
+!**/src/main/java/**/*.jar
+!**/src/test/java/**/*.jar
+
+# Spring Boot
+*.original
+application-*.properties.bak
+
+# =========================================================
+# 🐍 PYTHON
+# =========================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# =========================================================
+# ⚛️ REACT / NODE.js
+# =========================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# ESLint cache
+.eslintcache
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# =========================================================
+# 🗄️ DATABASES
+# =========================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================================================
+# 🐳 DOCKER
+# =========================================================
+.dockerignore.bak
+
+# =========================================================
+# 💻 IDEs & EDITORS
+# =========================================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.metadata
+.project
+.classpath
+.settings/
+bin/
+
+# VS Code / Cursor
+.vscode/
+.cursor/
+.claude/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =========================================================
+# 🖥️ OPERATING SYSTEMS
+# =========================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =========================================================
+# 📋 LOGS & TEMPORARY FILES
+# =========================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.cache/
+
+# =========================================================
+# 🔧 BUILD & DEPLOYMENT
+# =========================================================
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.properties
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# SBT
+.bsp/
+
+# =========================================================
+# 🧪 TESTING & COVERAGE
+# =========================================================
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+cover/
+*.cover
+*.py,cover
+.hypothesis/
+
+# =========================================================
+# 📦 PACKAGE MANAGERS
+# =========================================================
+# Pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# =========================================================
+# 🔒 SECURITY & KEYS
+# =========================================================
+# Certificate files
+*.crt
+*.csr
+*.pem
+*.key
+*.p12
+*.pfx
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+
+# =========================================================
+# 📝 DOCUMENTATION BUILD
+# =========================================================
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# =========================================================
+# 🎯 PROJECT SPECIFIC
+# =========================================================
+# JobGenie specific ignores
+probe_*.txt
+*.tar.gz
+
+# Redis dumps
+dump.rdb
+
+# AI model files (if storing locally)
+*.model
+*.pkl
+*.joblib
+
+# Vector databases
+vector_db/
+chroma_db/
+
+# File uploads
+uploads/
+temp/
+
+# =========================================================
+# 🗑️ NON-RELEVANT FILES TO REMOVE
+# =========================================================
+# Probe files (empty test files)
+probe_*.txt
+
+# Old documentation files that are outdated
+BUILD_ISSUES_FIXED.md
+INTEGRATION_STATUS_REPORT.md
+INTEGRATION_COMPLETE.md
+OPTIMIZED_ENV_CONFIG.md
+AI_TOOLS_OPTIMIZATION_PLAN.md
+JobGenie_Automation_System_Documentation.md
+ENV_CONFIGURATION_GUIDE.md
+FIREBASE_SETUP.md
+activate_optimizations.sh
+fix-maven-deps.sh
+validate-build.sh
+test-integration.sh
+setup.sh
+setup-local.md
+
+# Old nginx config (now in frontend)
+nginx.conf
+
+# SSL directory (if not needed for development)
+ssl/
+
+# App directory (if not used)
+app/
+
+# =========================================================
+# 📁 MAVEN REPOSITORY CACHES
+# =========================================================
+# Maven repository caches in service directories
+**/maven-repo/
+**/maven-repo/**/*
+
+# =========================================================
+# 🔄 DOCKER VOLUMES & CACHES
+# =========================================================
+# Docker volumes
+docker-volumes/
+docker-data/
+
+# =========================================================
+# 📊 MONITORING & METRICS
+# =========================================================
+# Prometheus data
+prometheus_data/
+grafana_data/
+
+# =========================================================
+# 🎯 DEVELOPMENT TOOLS
+# =========================================================
+# Local development files
+.local/
+local/

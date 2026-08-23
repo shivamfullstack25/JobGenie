@@ -1,0 +1,33 @@
+[gitleaks]
+version = "8.16.4"
+verbose = false
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|secret)['\"]?\s*[:=]\s*['"]?[a-zA-Z0-9]{32,45}['"]?'''
+tags = ["key", "api", "generic"]
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key"
+regex = '''AIza[0-9A-Za-z\\-_]{35}'''
+tags = ["key", "firebase"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "email-password"
+description = "Email Password"
+regex = '''(?i)(email|mail).*password.*['"]?[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}['"]?'''
+tags = ["email", "password"]
+
+[[rules]]
+id = "database-url"
+description = "Database URL with credentials"
+regex = '''(?i)(postgresql|mysql|mongodb)://[a-zA-Z0-9._%+-]+:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'''
+tags = ["database", "url"] 
