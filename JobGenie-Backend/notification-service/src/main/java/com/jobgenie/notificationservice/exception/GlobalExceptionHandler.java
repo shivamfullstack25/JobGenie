@@ -96,13 +96,13 @@ public class GlobalExceptionHandler {
     ErrorResponse errorResponse =
         ErrorResponse.builder()
             .timestamp(LocalDateTime.now())
-            .status(ex.getStatusCode().value())
-            .error(ex.getStatusCode().toString())
+            .status(ex.getStatus().value())
+            .error(ex.getStatus().name())
             .message(ex.getReason())
             .path(request.getDescription(false))
             .build();
 
-    return ResponseEntity.status(ex.getStatusCode()).body(errorResponse);
+    return ResponseEntity.status(ex.getStatus()).body(errorResponse);
   }
 
   /** Handle generic exceptions */
