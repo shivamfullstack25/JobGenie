@@ -1,0 +1,4 @@
+# Test-only dependencies. Run: pip install -r requirements-dev.txt && python -m pytest tests -q
+pytest>=8.0
+httpx>=0.25.0
+starlette>=0.36

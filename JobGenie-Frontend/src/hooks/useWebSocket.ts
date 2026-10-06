@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { API_BASE_URL } from '@/lib/queryClient';
+import { auth } from '@/firebase';
 
 export interface WebSocketMessage {
   type: 'job_match' | 'application_update' | 'notification' | 'system_update' | 'ai_analysis_complete' | 
@@ -46,12 +47,16 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
   const heartbeatTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (!backendUser?.id) return;
 
     try {
+      // Browsers can't set an Authorization header on a WebSocket handshake, so the gateway
+      // accepts the ID token as a query parameter on /ws/ paths only.
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
       const wsBase = API_BASE_URL.replace(/^http/, 'ws');
-      const wsUrl = `${wsBase}/ws/notifications/${backendUser.id}`;
+      const wsUrl = `${wsBase}/ws/notifications/${backendUser.id}?access_token=${encodeURIComponent(token)}`;
       ws.current = new WebSocket(wsUrl);
       setConnectionStatus('connecting');
 

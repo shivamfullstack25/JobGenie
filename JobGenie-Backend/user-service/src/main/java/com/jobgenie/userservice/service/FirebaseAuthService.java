@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,9 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import com.jobgenie.shared.entities.User;
+import com.jobgenie.shared.security.FirebaseTokenVerifier;
+import com.jobgenie.shared.security.FirebaseTokenVerifier.InvalidTokenException;
+import com.jobgenie.shared.security.FirebaseTokenVerifier.VerifiedToken;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +27,24 @@ public class FirebaseAuthService {
 
   private final UserService userService;
   private final ObjectMapper objectMapper = new ObjectMapper();
+
+  @Value("${firebase.project-id:jobgenie-d95c7}")
+  private String firebaseProjectId;
+
+  /** Offline-development escape hatch only. Never enable in a deployed environment. */
+  @Value("${jobgenie.auth.insecure-local-jwt:false}")
+  private boolean insecureLocalJwt;
+
+  private volatile FirebaseTokenVerifier tokenVerifier;
+
+  /** Test seam. */
+  void setTokenVerifier(FirebaseTokenVerifier tokenVerifier) {
+    this.tokenVerifier = tokenVerifier;
+  }
+
+  void setInsecureLocalJwt(boolean insecureLocalJwt) {
+    this.insecureLocalJwt = insecureLocalJwt;
+  }
 
   private FirebaseAuth firebaseAuthOrNull() {
     try {
@@ -50,34 +72,83 @@ public class FirebaseAuthService {
     }
   }
 
+  /**
+   * Verifies the ID token's signature and claims, then returns the matching user, creating the
+   * account on first sign-in.
+   *
+   * <p>Verification uses Google's public keys ({@link FirebaseTokenVerifier}), so it works whether
+   * or not a Firebase service-account file is present. This replaces the earlier behaviour, where
+   * any verification failure — or simply a missing service account — fell through to decoding the
+   * token payload and trusting it unsigned, which let anyone sign in as any user. That decode-only
+   * path now runs solely when {@code jobgenie.auth.insecure-local-jwt=true} is set for offline
+   * development, and is off by default.
+   */
   public User getOrCreateUserFromToken(String idToken) {
-    FirebaseAuth auth = firebaseAuthOrNull();
-    if (auth != null) {
-      try {
-        FirebaseToken decodedToken = auth.verifyIdToken(idToken);
-        return getOrCreateFromFirebaseToken(decodedToken);
-      } catch (Exception e) {
-        log.warn("Firebase verify failed, attempting local JWT fallback: {}", e.getMessage());
+    try {
+      return getOrCreateFromVerifiedToken(tokenVerifier().verify(idToken));
+    } catch (InvalidTokenException e) {
+      if (insecureLocalJwt) {
+        log.warn(
+            "INSECURE: accepting an unverified token because jobgenie.auth.insecure-local-jwt=true"
+                + " ({})",
+            e.getMessage());
+        return getOrCreateFromLocalJwt(idToken);
       }
-    } else {
-      log.warn("Firebase Admin unavailable — using local JWT claim fallback");
+      throw e;
     }
-
-    return getOrCreateFromLocalJwt(idToken);
   }
 
-  private User getOrCreateFromFirebaseToken(FirebaseToken decodedToken) {
+  private FirebaseTokenVerifier tokenVerifier() {
+    FirebaseTokenVerifier current = tokenVerifier;
+    if (current == null) {
+      current = new FirebaseTokenVerifier(firebaseProjectId);
+      tokenVerifier = current;
+    }
+    return current;
+  }
+
+  private User getOrCreateFromVerifiedToken(VerifiedToken token) {
+    User existing = null;
     try {
-      User existingUser = userService.getUserByFirebaseUid(decodedToken.getUid());
-      if (existingUser != null) {
-        existingUser.setLastLoginAt(LocalDateTime.now());
-        return userService.saveUser(existingUser);
+      existing = userService.getUserByFirebaseUid(token.getUid());
+    } catch (Exception ignored) {
+      // not found — created below
+    }
+    if (existing != null) {
+      existing.setLastLoginAt(LocalDateTime.now());
+      // Was only ever set at account creation, so a user who verified their email afterwards
+      // stayed "unverified" here forever and could never pass the apply/automation gate.
+      if (token.isEmailVerified() && !Boolean.TRUE.equals(existing.getIsEmailVerified())) {
+        existing.setIsEmailVerified(true);
       }
-    } catch (Exception e) {
-      log.info("User not found by Firebase UID: {}, creating new user", decodedToken.getUid());
+      return userService.saveUser(existing);
     }
 
-    return userService.saveUser(createUserFromFirebaseToken(decodedToken));
+    String email = token.getEmail();
+    if (email == null || email.isBlank()) {
+      email = token.getUid() + "@jobgenie.local";
+    }
+    String name = token.getName();
+    if (name == null || name.isBlank()) {
+      name = email;
+    }
+    User user =
+        User.builder()
+            .email(email)
+            .name(name)
+            .firebaseUid(token.getUid())
+            .authProvider("firebase")
+            .role("user")
+            .isEmailVerified(token.isEmailVerified())
+            .lastLoginAt(LocalDateTime.now())
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .build();
+    if (token.getPicture() != null) {
+      user.setProfileImageUrl(token.getPicture());
+    }
+    log.info("Created user from verified Firebase token: {}", email);
+    return userService.saveUser(user);
   }
 
   @SuppressWarnings("unchecked")
@@ -146,37 +217,6 @@ public class FirebaseAuthService {
       }
     }
     return null;
-  }
-
-  private User createUserFromFirebaseToken(FirebaseToken token) {
-    Map<String, Object> claims = token.getClaims();
-
-    User user =
-        User.builder()
-            .email(token.getEmail())
-            .name(token.getName() != null ? token.getName() : token.getEmail())
-            .authProvider("firebase")
-            .role("user")
-            .isEmailVerified(token.isEmailVerified())
-            .lastLoginAt(LocalDateTime.now())
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .build();
-
-    user.setFirebaseUid(token.getUid());
-
-    if (claims != null) {
-      if (claims.containsKey("picture")) {
-        user.setProfileImageUrl(claims.get("picture").toString());
-      }
-      if (claims.containsKey("given_name") && claims.containsKey("family_name")) {
-        user.setFirstName(claims.get("given_name").toString());
-        user.setLastName(claims.get("family_name").toString());
-      }
-    }
-
-    log.info("Created new user from Firebase token: {}", user.getEmail());
-    return user;
   }
 
   public User updateUserFromFirebase(String firebaseUid, FirebaseToken token) {

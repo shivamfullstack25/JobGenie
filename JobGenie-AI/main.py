@@ -39,10 +39,23 @@ def _safe_import(label: str, factory):
 
 app = FastAPI(title="JobGenie AI Service", version="1.0.0")
 
-# Add CORS middleware
+# Identity enforcement: every request except /health, / and /metrics must carry the signed
+# X-Auth-* headers issued by the API gateway or a peer service (see app/core/internal_auth.py).
+# Added before CORS so CORS stays the outermost layer.
+from app.core.internal_auth import InternalAuthMiddleware
+
+app.add_middleware(InternalAuthMiddleware)
+
+# CORS: browsers reach this service through the gateway, never directly, so only the configured
+# frontend origins are allowed (was "*" together with allow_credentials=True).
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

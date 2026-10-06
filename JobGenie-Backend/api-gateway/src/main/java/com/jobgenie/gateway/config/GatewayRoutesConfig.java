@@ -37,58 +37,9 @@ public class GatewayRoutesConfig {
         // AI SERVICE — specific routes BEFORE broader /api/jobs/** catch-all
         // ==================================================
         .route(
-            "ai-search-and-apply",
-            r ->
-                r.path("/api/jobs/search-and-apply")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-advanced-auto-apply",
-            r ->
-                r.path("/api/advanced-auto-apply")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-auto-apply-batch",
-            r ->
-                r.path("/api/auto-apply/batch")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-auto-apply-linkedin",
-            r ->
-                r.path("/api/auto-apply/linkedin")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-auto-apply-indeed",
-            r ->
-                r.path("/api/auto-apply/indeed")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-auto-apply-naukri",
-            r ->
-                r.path("/api/auto-apply/naukri")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
             "ai-schedule-job-search",
             r ->
                 r.path("/api/schedule/job-search")
-                    .and()
-                    .method(HttpMethod.POST)
-                    .uri("lb://ai-service"))
-        .route(
-            "ai-schedule-auto-apply",
-            r ->
-                r.path("/api/schedule/auto-apply")
                     .and()
                     .method(HttpMethod.POST)
                     .uri("lb://ai-service"))

@@ -3,9 +3,12 @@ package com.jobgenie.resumeservice.controller;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +20,8 @@ import com.jobgenie.resumeservice.service.ExportService;
 import com.jobgenie.resumeservice.service.ResumeService;
 import com.jobgenie.shared.dto.ResumeDto;
 import com.jobgenie.shared.exception.ResumeNotFoundException;
+import com.jobgenie.shared.security.AuthPrincipal;
+import com.jobgenie.shared.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,12 +39,36 @@ public class ResumeController {
   @Autowired private AIServiceClient aiServiceClient;
   @Autowired private ExportService exportService;
 
+  /**
+   * Resume endpoints are addressed by resume id, which says nothing about who is asking — before
+   * this check any caller could read, export, deactivate or delete any user's resume by counting
+   * ids. A missing resume is treated as "allowed" so the endpoint returns its normal 404.
+   */
+  private boolean ownsResume(HttpServletRequest request, Long resumeId) {
+    AuthPrincipal caller = CurrentUser.of(request);
+    if (caller.isPrivileged()) {
+      return true;
+    }
+    ResumeDto resume = resumeService.getResume(resumeId);
+    return resume == null || caller.canActFor(resume.getUserId());
+  }
+
   @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(
       summary = "Upload and process resume",
       description = "Upload a resume file and extract metadata")
   public ResponseEntity<ResumeUploadResponse> uploadResume(
-      @RequestParam("file") MultipartFile file, @RequestParam("userId") Long userId) {
+      @RequestParam("file") MultipartFile file,
+      @RequestParam("userId") Long userId,
+      HttpServletRequest request) {
+    if (!CurrentUser.canActFor(request, userId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(
+              ResumeUploadResponse.builder()
+                  .success(false)
+                  .error("You can only upload resumes to your own account")
+                  .build());
+    }
     log.info(
         "Received resume upload for userId={}, fileName={}", userId, file.getOriginalFilename());
     try {
@@ -64,7 +93,10 @@ public class ResumeController {
   @Operation(
       summary = "Get resume details",
       description = "Retrieve detailed information about a specific resume")
-  public ResponseEntity<ResumeDto> getResume(@PathVariable Long resumeId) {
+  public ResponseEntity<ResumeDto> getResume(@PathVariable Long resumeId, HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     ResumeDto resume = resumeService.getResume(resumeId);
     if (resume != null) {
       return ResponseEntity.ok(resume);
@@ -75,7 +107,10 @@ public class ResumeController {
 
   @DeleteMapping("/{resumeId}")
   @Operation(summary = "Delete resume", description = "Delete a specific resume")
-  public ResponseEntity<Void> deleteResume(@PathVariable Long resumeId) {
+  public ResponseEntity<Void> deleteResume(@PathVariable Long resumeId, HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     boolean deleted = resumeService.deleteResume(resumeId);
     if (deleted) {
       return ResponseEntity.ok().build();
@@ -86,7 +121,10 @@ public class ResumeController {
 
   @PutMapping("/{resumeId}/activate")
   @Operation(summary = "Activate resume", description = "Set a resume as active")
-  public ResponseEntity<Void> activateResume(@PathVariable Long resumeId) {
+  public ResponseEntity<Void> activateResume(@PathVariable Long resumeId, HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     boolean activated = resumeService.activateResume(resumeId);
     if (activated) {
       return ResponseEntity.ok().build();
@@ -97,7 +135,10 @@ public class ResumeController {
 
   @GetMapping("/{resumeId}/content")
   @Operation(summary = "Get resume content", description = "Retrieve the text content of a resume")
-  public ResponseEntity<String> getResumeContent(@PathVariable Long resumeId) {
+  public ResponseEntity<String> getResumeContent(@PathVariable Long resumeId, HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     String content = resumeService.getResumeContent(resumeId);
     if (content != null) {
       return ResponseEntity.ok(content);
@@ -151,7 +192,11 @@ public class ResumeController {
   public ResponseEntity<Resource> exportResumeToPdf(
       @Parameter(description = "Resume ID") @PathVariable Long resumeId,
       @Parameter(description = "Format template") @RequestParam(defaultValue = "professional")
-          String format) {
+          String format,
+      HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     log.info("Exporting resume {} to PDF format: {}", resumeId, format);
     try {
       Resource pdfResource = exportService.exportResumeToPdf(resumeId, format);
@@ -173,7 +218,11 @@ public class ResumeController {
   @GetMapping("/{resumeId}/export/json")
   @Operation(summary = "Export resume as JSON", description = "Export resume data as JSON")
   public ResponseEntity<String> exportResumeToJson(
-      @Parameter(description = "Resume ID") @PathVariable Long resumeId) {
+      @Parameter(description = "Resume ID") @PathVariable Long resumeId,
+      HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     log.info("Exporting resume {} to JSON", resumeId);
     try {
       String jsonData = exportService.exportResumeToJson(resumeId);
@@ -197,7 +246,13 @@ public class ResumeController {
       summary = "Export multiple resumes as ZIP",
       description = "Export multiple resumes as a ZIP file containing PDFs")
   public ResponseEntity<Resource> exportMultipleResumes(
-      @Parameter(description = "List of resume IDs") @RequestBody List<Long> resumeIds) {
+      @Parameter(description = "List of resume IDs") @RequestBody List<Long> resumeIds,
+      HttpServletRequest request) {
+    for (Long resumeId : resumeIds) {
+      if (!ownsResume(request, resumeId)) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+      }
+    }
     log.info("Exporting {} resumes to ZIP", resumeIds.size());
     try {
       Resource zipResource = exportService.exportMultipleResumesToZip(resumeIds);
@@ -237,7 +292,11 @@ public class ResumeController {
       summary = "Export resume analytics",
       description = "Export detailed analytics for a resume as JSON")
   public ResponseEntity<String> exportResumeAnalytics(
-      @Parameter(description = "Resume ID") @PathVariable Long resumeId) {
+      @Parameter(description = "Resume ID") @PathVariable Long resumeId,
+      HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     log.info("Exporting analytics for resume {}", resumeId);
     try {
       String analyticsData = exportService.exportResumeAnalytics(resumeId);
@@ -263,7 +322,11 @@ public class ResumeController {
   public ResponseEntity<Resource> exportATSOptimizedResume(
       @Parameter(description = "Resume ID") @PathVariable Long resumeId,
       @Parameter(description = "Job description for optimization") @RequestBody
-          String jobDescription) {
+          String jobDescription,
+      HttpServletRequest request) {
+    if (!ownsResume(request, resumeId)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     log.info("Exporting ATS-optimized resume {} for job description", resumeId);
     try {
       Resource pdfResource = exportService.exportATSOptimizedResume(resumeId, jobDescription);

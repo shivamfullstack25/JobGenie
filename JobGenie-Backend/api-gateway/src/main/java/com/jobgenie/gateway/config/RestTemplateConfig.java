@@ -2,10 +2,13 @@ package com.jobgenie.gateway.config;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
+
+import com.jobgenie.shared.security.ServiceAuthInterceptor;
 
 @Configuration
 public class RestTemplateConfig {
@@ -25,11 +28,17 @@ public class RestTemplateConfig {
   // Reactor Schedulers.parallel() thread ("block()/blockFirst()/blockLast() are blocking, which
   // is not supported in thread parallel-1"), silently caught by each caller and returning 0/DOWN
   // for every count. Removing @LoadBalanced makes this a plain blocking RestTemplate again.
+  //
+  // Because the builder is constructed here rather than injected, the shared module's
+  // RestTemplateCustomizer does not reach it — so the service-signature interceptor (which lets
+  // the gateway's own calls to user/job/resume-service pass their InternalAuthFilter) is added
+  // explicitly.
   @Bean
-  public RestTemplate restTemplate() {
+  public RestTemplate restTemplate(@Value("${INTERNAL_AUTH_SECRET:}") String internalAuthSecret) {
     return new RestTemplateBuilder()
         .setConnectTimeout(Duration.ofSeconds(5))
         .setReadTimeout(Duration.ofSeconds(10))
+        .additionalInterceptors(new ServiceAuthInterceptor(internalAuthSecret))
         .build();
   }
 }

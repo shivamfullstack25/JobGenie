@@ -1,5 +1,6 @@
-version: '3.8'
-
+# Only the frontend (3000) and API gateway (8080) are meant to be reached from other machines.
+# Every other port is bound to 127.0.0.1: reachable from this host for debugging, not from the
+# network. Services additionally reject any request without a gateway-signed identity.
 services:
   postgres:
     image: postgres:15
@@ -9,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobgenie_pass}
       POSTGRES_DB: ${POSTGRES_DB:-jobgenie_db}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./sql/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
@@ -25,7 +26,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -40,7 +41,7 @@ services:
       dockerfile: eureka-server/Dockerfile
     restart: always
     ports:
-      - "8761:8761"
+      - "127.0.0.1:8761:8761"
     environment:
       SPRING_PROFILES_ACTIVE: docker
     depends_on: []
@@ -61,6 +62,10 @@ services:
       dockerfile: job-service/Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
+      USER_SERVICE_URL: http://user-service:8081
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_jobs
       DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
@@ -76,7 +81,7 @@ services:
       eureka-server:
         condition: service_healthy
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       interval: 30s
@@ -94,6 +99,11 @@ services:
       dockerfile: user-service/Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
+      RESUME_SERVICE_URL: http://resume-service:8083
+      JOB_SERVICE_URL: http://job-service:8082
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_users
       DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
@@ -119,7 +129,7 @@ services:
       eureka-server:
         condition: service_healthy
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -138,6 +148,9 @@ services:
       dockerfile: resume-service/Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_resumes
       DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
@@ -154,7 +167,7 @@ services:
       ai-service:
         condition: service_started
     ports:
-      - "8083:8083"
+      - "127.0.0.1:8083:8083"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
       interval: 30s
@@ -172,6 +185,9 @@ services:
       dockerfile: notification-service/Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL: jdbc:postgresql://postgres:5432/jobgenie_notifications
       DATABASE_USERNAME: ${DATABASE_USERNAME:-jobgenie_user}
@@ -186,7 +202,7 @@ services:
       eureka-server:
         condition: service_healthy
     ports:
-      - "8084:8084"
+      - "127.0.0.1:8084:8084"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
       interval: 30s
@@ -204,6 +220,11 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
+      USER_SERVICE_URL: http://user-service:8081
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       # Core AI Configuration — Groq (free) tried first, then Gemini (free
       # tier), then paid OpenAI — see crew_ai_service.py's select_llm() for
       # the full cost-ascending priority chain.
@@ -240,12 +261,6 @@ services:
       MEMORY_K: ${MEMORY_K:-10}
       CONTEXT_WINDOW: ${CONTEXT_WINDOW:-4000}
       MAX_CONTEXT_LENGTH: ${MAX_CONTEXT_LENGTH:-4000}
-      
-      # Browser Automation
-      HEADLESS_BROWSER: ${HEADLESS_BROWSER:-false}
-      AUTO_APPLY_ENABLED: ${AUTO_APPLY_ENABLED:-false}
-      MAX_CONCURRENT_APPLICATIONS: ${MAX_CONCURRENT_APPLICATIONS:-5}
-      BROWSER_TIMEOUT: ${BROWSER_TIMEOUT:-30000}
       
       # Database and Redis
       POSTGRES_URL: ${POSTGRES_URL:-postgresql://jobgenie_user:jobgenie_pass@postgres:5432/jobgenie_ai}
@@ -293,7 +308,7 @@ services:
       DEBUG: ${DEBUG:-false}
       RELOAD: ${RELOAD:-false}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -319,6 +334,10 @@ services:
       dockerfile: api-gateway/Dockerfile
     restart: always
     environment:
+      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
       REDIS_HOST: ${REDIS_HOST:-redis}

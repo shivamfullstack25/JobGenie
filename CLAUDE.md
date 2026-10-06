@@ -182,11 +182,14 @@ Considered and deliberately deferred (lower ROI for this pass, noted for later):
 ## Engineering constraints
 
 1. **Gateway is reactive** — don't inject `RestTemplateBuilder` as a bean in api-gateway; construct directly.
-2. **Firebase optional** — `firebase-service-account.json` missing → JWT fallback in user-service.
+2. **Firebase service account optional** — ID tokens are verified against Google's public keys (`shared/.../FirebaseTokenVerifier`), which needs no `firebase-service-account.json`. The old unsigned "local JWT fallback" is OFF by default and must stay off outside offline dev (`jobgenie.auth.insecure-local-jwt=true`). The service account is only needed to delete Firebase users on account deletion.
 3. **Docker Desktop** — builds are slow; use `lean-start.ps1` for incremental bring-up.
 4. **KAFKA_ENABLED=false** in `.env` — Kafka not required for core flow.
 5. **Graceful degradation** — optional imports (Playwright, CrewAI) must not crash the AI service.
 6. **Don't collapse microservices** — boundaries are sound; fix internals.
+7. **Identity comes from the gateway, never from the request** — `GatewayAuthFilter` verifies the Firebase ID token and forwards HMAC-signed `X-Auth-*` headers; every service (`InternalAuthFilter`, auto-configured from `shared`) and the AI service (`app/core/internal_auth.py`) reject requests without a valid signature. A `userId` param/path segment must equal the authenticated user unless the caller is an admin or a service. For a user id in a JSON body, or data addressed by another id (resume, schedule), check ownership in the controller with `CurrentUser`. New endpoints that are public or service-only must be added to the path lists in those three files.
+8. **`INTERNAL_AUTH_SECRET` is required** (same value everywhere, ≥32 chars, in `.env`). Rollback switch: `AUTH_ENFORCEMENT=report-only` (verify + log, block nothing) or `off`.
+9. **No host Maven/Python 3.11** — run backend tests with `docker run --rm -v <repo>/JobGenie-Backend:/w -v jobgenie-m2:/root/.m2 -w /w maven:3.9.6-eclipse-temurin-17 mvn -B test -Dspotless.check.skip=true`; AI tests in `python:3.11-slim` with `requirements-dev.txt`; frontend with `npm test` (Vitest).
 
 ---
 
@@ -206,6 +209,10 @@ cd JobGenie-Frontend; npm run dev   # :3000
 ```
 
 ---
+
+## Overhaul in progress (started 2026-10-06)
+
+Target: "AI Career Operating System". Read `PROJECT_AUDIT.md`, `ARCHITECTURE_MAP.md`, `MIGRATION_PLAN.md`, `docs/platform-compliance.md` first; per-phase notes live in `docs/migration-notes/`. Phase order is strict: 1A safety net → 1B profile/versions/resume → 2 job intelligence → 3 application packages → 4 approval + tracking → 5 platform adapters → 6 browser assistance (needs explicit re-approval) → 7 analytics. Owner decisions on 2026-10-06: security-first ordering approved; HTML scrapers to be retired in Phase 2 (this supersedes "cached scrape fallback" above).
 
 ## How to work in this repo
 

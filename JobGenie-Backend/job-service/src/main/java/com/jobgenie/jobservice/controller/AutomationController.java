@@ -4,10 +4,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+
+import com.jobgenie.shared.security.AuthPrincipal;
+import com.jobgenie.shared.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +33,27 @@ public class AutomationController {
 
   private final RestTemplate restTemplate;
 
+  /**
+   * Schedules are held by the AI service and addressed by an id of the form
+   * {@code schedule_<userId>_<timestamp>}. That embedded user id is the only ownership record
+   * there is, so it is what gets checked: without it any caller could pause, run or delete
+   * anyone's schedule by guessing the id.
+   */
+  private static boolean ownsSchedule(HttpServletRequest request, String scheduleId) {
+    AuthPrincipal caller = CurrentUser.of(request);
+    if (caller.isPrivileged()) {
+      return true;
+    }
+    return scheduleId != null
+        && !caller.getUserId().isEmpty()
+        && scheduleId.startsWith("schedule_" + caller.getUserId() + "_");
+  }
+
+  private static ResponseEntity<Map<String, Object>> forbidden() {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(Map.of("success", false, "error", "You can only manage your own schedules"));
+  }
+
   @PostMapping("/schedule-advanced")
   @Operation(
       summary = "Create a job-search schedule",
@@ -34,7 +61,10 @@ public class AutomationController {
           "Set up a recurring job search (search only — see CLAUDE.md 'Product decisions"
               + " (locked)': JobGenie doesn't auto-apply on the user's behalf).")
   public ResponseEntity<Map<String, Object>> createAdvancedSchedule(
-      @RequestBody Map<String, Object> scheduleRequest) {
+      @RequestBody Map<String, Object> scheduleRequest, HttpServletRequest httpRequest) {
+    if (!CurrentUser.canActFor(httpRequest, scheduleRequest.get("userId"))) {
+      return forbidden();
+    }
     try {
       log.info("Creating job-search schedule for user: {}", scheduleRequest.get("userId"));
 
@@ -59,7 +89,10 @@ public class AutomationController {
       summary = "Run a job-search schedule now",
       description = "Execute a scheduled job search immediately and return the results found.")
   public ResponseEntity<Map<String, Object>> runAdvancedAutomation(
-      @PathVariable String scheduleId) {
+      @PathVariable String scheduleId, HttpServletRequest httpRequest) {
+    if (!ownsSchedule(httpRequest, scheduleId)) {
+      return forbidden();
+    }
     try {
       log.info("Running job-search schedule now: {}", scheduleId);
 
@@ -116,7 +149,11 @@ public class AutomationController {
       summary = "Toggle schedule status",
       description = "Enable or disable an automation schedule")
   public ResponseEntity<Map<String, Object>> toggleSchedule(
-      @PathVariable String scheduleId, @RequestBody Map<String, Object> request) {
+      @PathVariable String scheduleId, @RequestBody Map<String, Object> request,
+      HttpServletRequest httpRequest) {
+    if (!ownsSchedule(httpRequest, scheduleId)) {
+      return forbidden();
+    }
     try {
       log.info("Toggling schedule {} to: {}", scheduleId, request.get("isActive"));
 
@@ -140,12 +177,15 @@ public class AutomationController {
       summary = "Run automation schedule",
       description = "Execute a specific automation schedule immediately")
   public ResponseEntity<Map<String, Object>> runAutomationSchedule(
-      @PathVariable String scheduleId) {
+      @PathVariable String scheduleId, HttpServletRequest httpRequest) {
+    if (!ownsSchedule(httpRequest, scheduleId)) {
+      return forbidden();
+    }
     try {
       log.info("Running automation schedule: {}", scheduleId);
 
       // For backward compatibility, use the advanced automation endpoint
-      return runAdvancedAutomation(scheduleId);
+      return runAdvancedAutomation(scheduleId, httpRequest);
 
     } catch (Exception e) {
       log.error("Error running schedule: {}", e.getMessage(), e);
@@ -214,11 +254,14 @@ public class AutomationController {
       summary = "Create automation schedule",
       description = "Create a basic automation schedule")
   public ResponseEntity<Map<String, Object>> createSchedule(
-      @RequestBody Map<String, Object> scheduleRequest) {
+      @RequestBody Map<String, Object> scheduleRequest, HttpServletRequest httpRequest) {
+    if (!CurrentUser.canActFor(httpRequest, scheduleRequest.get("userId"))) {
+      return forbidden();
+    }
     try {
       log.info("Creating automation schedule for user: {}", scheduleRequest.get("userId"));
 
-      return createAdvancedSchedule(scheduleRequest);
+      return createAdvancedSchedule(scheduleRequest, httpRequest);
 
     } catch (Exception e) {
       log.error("Error creating schedule: {}", e.getMessage(), e);

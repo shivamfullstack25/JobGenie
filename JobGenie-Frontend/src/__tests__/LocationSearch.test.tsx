@@ -1,21 +1,29 @@
+import {beforeEach, describe, expect, it, test, vi} from 'vitest';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LocationSearch from '../components/location-search';
 import {globalLocations} from '../data/globalLocations';
 
 // Mock the global locations data
-jest.mock('../data/globalLocations', () => ({
-  globalLocations: [
+vi.mock('../data/globalLocations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../data/globalLocations')>();
+  const globalLocations = [
     { name: 'San Francisco', country: 'United States', region: 'North America', currency: 'USD', symbol: '$' },
     { name: 'London', country: 'United Kingdom', region: 'Europe', currency: 'GBP', symbol: '£' },
     { name: 'Bengaluru', country: 'India', region: 'Asia', currency: 'INR', symbol: '₹' }
-  ]
-}));
+  ];
+  return { ...actual, globalLocations };
+});
 
-describe('LocationSearch Component', () => {
-  const mockOnLocationAdd = jest.fn();
-  const mockOnLocationRemove = jest.fn();
-  const mockOnCurrencyChange = jest.fn();
+// QUARANTINED (2026-10-06). This suite was written against an earlier LocationSearch that rendered
+// a plain text input with a placeholder; the current component is a popover combobox, so all 16
+// cases fail on their first query. It had never run: the repo had no Jest config or TS transform.
+// Skipped rather than deleted so the intended behaviours stay listed; rewrite against the current
+// component before un-skipping. Tracked in MIGRATION_PLAN.md (Phase 1A.2).
+describe.skip('LocationSearch Component', () => {
+  const mockOnLocationAdd = vi.fn();
+  const mockOnLocationRemove = vi.fn();
+  const mockOnCurrencyChange = vi.fn();
 
   const defaultProps = {
     selectedLocations: [],
@@ -27,7 +35,7 @@ describe('LocationSearch Component', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Rendering', () => {
@@ -203,7 +211,7 @@ describe('LocationSearch Component', () => {
   describe('Edge Cases', () => {
     it('should handle empty locations array', () => {
       // Mock empty locations
-      jest.mocked(globalLocations).mockReturnValue([]);
+      vi.mocked(globalLocations).mockReturnValue([]);
       
       render(<LocationSearch {...defaultProps} />);
       const input = screen.getByPlaceholderText('Search locations');

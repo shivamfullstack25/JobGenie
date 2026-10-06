@@ -17,9 +17,10 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   /**
-   * Phase 2: Permit API traffic through the gateway while Firebase auth is handled by user-service
-   * at /api/auth/verify. Gateway-level JWT enforcement will be added once the frontend propagates
-   * Authorization headers on every request.
+   * Authentication is enforced by {@link GatewayAuthFilter}, which runs immediately after this
+   * chain: it verifies the Firebase ID token on every non-public request and forwards a signed
+   * identity to the services. This chain is left permit-all on purpose and only supplies CORS and
+   * disables the form/basic/CSRF defaults — do not read "permitAll" here as "unauthenticated".
    */
   @Bean
   public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {

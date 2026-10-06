@@ -24,6 +24,8 @@ except ImportError:
     sendgrid = None  # type: ignore
     Mail = None  # type: ignore
 
+from app.core.internal_auth import service_headers
+
 logger = logging.getLogger(__name__)
 
 class NotificationService:
@@ -632,11 +634,15 @@ class NotificationService:
     async def _get_user_info(self, user_id: str) -> Dict[str, Any]:
         """Get user information from backend service"""
         try:
-            # This would typically make an API call to the user service
-            backend_url = os.getenv('BACKEND_URL', 'http://api-gateway:8080')
-            
+            # Called service-to-service (signed), straight to user-service: the gateway only
+            # accepts end-user tokens, which this background job does not have.
+            user_service_url = os.getenv('USER_SERVICE_URL', 'http://user-service:8081')
+            auth_headers = service_headers(os.getenv('INTERNAL_AUTH_SECRET', ''))
+
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{backend_url}/api/users/{user_id}") as response:
+                async with session.get(
+                    f"{user_service_url}/api/users/{user_id}", headers=auth_headers
+                ) as response:
                     if response.status == 200:
                         return await response.json()
                     else:

@@ -91,7 +91,6 @@ export default function Profile() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [linkedinProfile, setLinkedinProfile] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const { user, backendUser, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -367,34 +366,6 @@ export default function Profile() {
     }
   };
 
-  const handleConnectLinkedIn = () => {
-    if (!user) return;
-    const width = 600, height = 600;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    const win = window.open(
-      `/api/auth/linkedin?userId=${user.uid}`,
-      "LinkedInLogin",
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    const timer = setInterval(async () => {
-      if (win && win.closed) {
-        clearInterval(timer);
-        // Fetch LinkedIn data from backend (assume endpoint /api/users/me or similar)
-        const res = await fetch("/api/users/me?userId=" + user.uid);
-        const updatedUser = await res.json();
-        if (updatedUser.linkedinUrl) {
-          setLinkedinProfile({
-            firstName: updatedUser.firstName || updatedUser.name?.split(' ')[0] || '',
-            lastName: updatedUser.lastName || updatedUser.name?.split(' ')[1] || '',
-            linkedinUrl: updatedUser.linkedinUrl
-          });
-          // Optionally, update Firestore here
-        }
-      }
-    }, 1000);
-  };
-
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
   };
@@ -646,16 +617,8 @@ export default function Profile() {
                         />
                       </div>
                     </div>
-                    <Button onClick={handleConnectLinkedIn} className="bg-blue-700 text-white w-full flex items-center gap-2">
-                      <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-10h3v10zm-1.5-11.268c-.966 0-1.75-.784-1.75-1.75s.784-1.75 1.75-1.75 1.75.784 1.75 1.75-.784 1.75-1.75 1.75zm13.5 11.268h-3v-5.604c0-1.337-.025-3.063-1.868-3.063-1.868 0-2.154 1.459-2.154 2.968v5.699h-3v-10h2.881v1.367h.041c.401-.761 1.379-1.563 2.841-1.563 3.039 0 3.6 2.001 3.6 4.599v5.597z"/></svg>
-                      Connect LinkedIn
-                    </Button>
-                    {linkedinProfile && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded text-blue-900">
-                        Connected to LinkedIn as: {linkedinProfile.firstName} {linkedinProfile.lastName}<br />
-                        <a href={linkedinProfile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-700">View LinkedIn Profile</a>
-                      </div>
-                    )}
+                    {/* "Connect LinkedIn" (OAuth popup) was removed: the backend handler was unsafe and is
+                        disabled (see gateway AuthController). Enter your LinkedIn URL above instead. */}
                   </div>
                 </div>
 

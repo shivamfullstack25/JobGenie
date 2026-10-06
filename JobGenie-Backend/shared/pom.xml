@@ -58,5 +58,12 @@
             <artifactId>hibernate-types-52</artifactId>
             <version>2.21.1</version>
         </dependency>
+
+        <!-- Firebase ID token verification against Google's public JWKS (no service account needed) -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.37.3</version>
+        </dependency>
     </dependencies>
 </project> 

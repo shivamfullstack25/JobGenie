@@ -38,9 +38,9 @@ jobs:
           cache: maven
           cache-dependency-path: JobGenie-Backend/pom.xml
 
-      - name: Compile backend
+      - name: Build and test backend
         working-directory: JobGenie-Backend
-        run: mvn -B -DskipTests -Dspotless.skip=true package
+        run: mvn -B -Dspotless.skip=true package
 
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
@@ -69,6 +69,12 @@ jobs:
           python -m compileall -q .
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 
+      - name: Test AI service
+        working-directory: JobGenie-AI
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pytest tests -q
+
   frontend:
     name: Frontend (React/TypeScript)
     runs-on: ubuntu-latest
@@ -86,6 +92,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: JobGenie-Frontend
         run: npm ci
+
+      - name: Test frontend
+        working-directory: JobGenie-Frontend
+        run: npm test
 
       - name: Build frontend
         working-directory: JobGenie-Frontend

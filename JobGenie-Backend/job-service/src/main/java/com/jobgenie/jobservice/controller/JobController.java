@@ -3,6 +3,8 @@ package com.jobgenie.jobservice.controller;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,8 @@ import com.jobgenie.shared.dto.JobApplicationDto;
 import com.jobgenie.shared.dto.JobDto;
 import com.jobgenie.shared.dto.JobMatchDto;
 import com.jobgenie.shared.entities.SavedJob;
+
+import com.jobgenie.shared.security.CurrentUser;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -216,7 +220,13 @@ public class JobController {
 
   @PostMapping("/saved")
   @Operation(summary = "Save a job", description = "Bookmark a job for later")
-  public ResponseEntity<Map<String, Object>> saveJob(@RequestBody Map<String, Object> payload) {
+  public ResponseEntity<Map<String, Object>> saveJob(
+      @RequestBody Map<String, Object> payload, HttpServletRequest request) {
+    // userId arrives in the JSON body here, where the auth filter can't see it.
+    if (!CurrentUser.canActFor(request, payload.get("userId"))) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(Map.of("error", "You can only save jobs to your own account"));
+    }
     try {
       Long userId = Long.parseLong(String.valueOf(payload.get("userId")));
       String jobId = String.valueOf(payload.get("jobId"));
@@ -280,8 +290,12 @@ public class JobController {
       summary = "Start job automation",
       description = "Start automated job search and application process")
   public ResponseEntity<Map<String, Object>> startAutomation(
-      @RequestBody Map<String, Object> config) {
+      @RequestBody Map<String, Object> config, HttpServletRequest request) {
     log.info("Starting job automation");
+    if (!CurrentUser.canActFor(request, config.get("userId"))) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .body(Map.of("error", "You can only manage your own automation"));
+    }
     try {
       // Extract config parameters
       String userId = (String) config.get("userId");
