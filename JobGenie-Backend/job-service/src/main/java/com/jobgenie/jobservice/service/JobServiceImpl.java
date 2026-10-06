@@ -181,7 +181,7 @@ public class JobServiceImpl implements JobService {
       String jobId, String userId, String resumeId, String coverLetterId) {
     try {
       log.info(
-          "Applying to job: jobId={}, userId={}, resumeId={}, coverLetterId={}",
+          "Logging manual application: jobId={}, userId={}, resumeId={}, coverLetterId={}",
           jobId,
           userId,
           resumeId,
@@ -190,16 +190,6 @@ public class JobServiceImpl implements JobService {
       if (jobApplicationRepository.existsByUserIdAndJobId(userId, jobId)) {
         throw new JobGenieException(
             "User has already applied to this job", "DUPLICATE_APPLICATION");
-      }
-
-      // The AI /api/auto-apply endpoint requires resume_content and cover_letter fields — it
-      // does not accept bare IDs. Fetch the actual resume content from resume-service so the
-      // application isn't submitted with nothing behind it.
-      ResumeDto resume = resumeServiceClient.getResume(Long.parseLong(resumeId));
-      String resumeContent = resume != null ? resume.getContent() : null;
-      if (resumeContent == null || resumeContent.isBlank()) {
-        throw new JobGenieException(
-            "No resume content found for resumeId=" + resumeId, "RESUME_CONTENT_NOT_FOUND");
       }
 
       // Was hardcoded to "LinkedIn" regardless of where the job actually came from, mislabeling
@@ -211,40 +201,23 @@ public class JobServiceImpl implements JobService {
               .filter(p -> p != null && !p.isBlank())
               .orElse("LinkedIn");
 
-      Map<String, Object> request = new HashMap<>();
-      request.put("job_id", jobId);
-      request.put("platform", platform);
-      request.put("user_id", userId);
-      request.put("resume_id", resumeId);
-      request.put("cover_letter_id", coverLetterId);
-      request.put("resume_content", resumeContent);
-      // resume-service's cover-letter generation endpoint has a parameter-order bug (out of
-      // this vertical's scope — see JobGenie-Backend/resume-service) and can't be called
-      // safely yet, and no cover-letter storage exists to resolve coverLetterId against. Send
-      // an empty string rather than fabricate content that would look AI-generated when it
-      // isn't.
-      request.put("cover_letter", "");
+      // JobGenie is a metasearch/click-out product (see CLAUDE.md "Product decisions
+      // (locked)"): the user applies on the destination site themselves. This just records
+      // that they did, for their own application history — no AI service call, no credential
+      // or browser automation of any kind.
+      JobApplication application =
+          JobApplication.builder()
+              .jobId(jobId)
+              .userId(userId)
+              .resumeId(resumeId)
+              .coverLetterId(coverLetterId)
+              .platform(platform)
+              .status("APPLIED")
+              .appliedAt(LocalDateTime.now())
+              .build();
 
-      ResponseEntity<Map> response = postJson(aiServiceUrl + "/api/auto-apply", request);
-
-      if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-        Map<String, Object> result = response.getBody();
-
-        JobApplication application =
-            JobApplication.builder()
-                .jobId(jobId)
-                .userId(userId)
-                .resumeId(resumeId)
-                .coverLetterId(coverLetterId)
-                .platform(platform)
-                .status("APPLIED")
-                .appliedAt(LocalDateTime.now())
-                .metadata(result)
-                .build();
-
-        JobApplication savedApplication = jobApplicationRepository.save(application);
-        return mapToJobApplicationDto(savedApplication);
-      }
+      JobApplication savedApplication = jobApplicationRepository.save(application);
+      return mapToJobApplicationDto(savedApplication);
     } catch (JobGenieException e) {
       throw e;
     } catch (Exception e) {
@@ -252,8 +225,6 @@ public class JobServiceImpl implements JobService {
       throw new JobGenieException(
           "Failed to apply to job: " + e.getMessage(), "JOB_APPLICATION_ERROR");
     }
-
-    throw new JobGenieException("Application failed", "APPLICATION_FAILED");
   }
 
   @Override
@@ -272,6 +243,43 @@ public class JobServiceImpl implements JobService {
       throw new JobGenieException(
           "Failed to get user applications: " + e.getMessage(), "GET_APPLICATIONS_ERROR");
     }
+  }
+
+  private static final java.util.Set<String> VALID_APPLICATION_STATUSES =
+      java.util.Set.of("APPLIED", "INTERVIEWING", "OFFER", "REJECTED", "WITHDRAWN");
+
+  @Override
+  public JobApplicationDto updateApplicationStatus(Long applicationId, String userId, String status) {
+    log.info(
+        "Updating application status: applicationId={}, userId={}, status={}",
+        applicationId,
+        userId,
+        status);
+
+    String normalizedStatus = status == null ? null : status.trim().toUpperCase();
+    if (!VALID_APPLICATION_STATUSES.contains(normalizedStatus)) {
+      throw new JobGenieException(
+          "Invalid status. Must be one of: " + VALID_APPLICATION_STATUSES, "INVALID_STATUS", 400);
+    }
+
+    JobApplication application =
+        jobApplicationRepository
+            .findById(applicationId)
+            .orElseThrow(
+                () ->
+                    new JobGenieException(
+                        "Application not found: " + applicationId,
+                        "APPLICATION_NOT_FOUND",
+                        404));
+
+    if (!application.getUserId().equals(userId)) {
+      throw new JobGenieException(
+          "Application does not belong to this user", "APPLICATION_ACCESS_DENIED", 403);
+    }
+
+    application.setStatus(normalizedStatus);
+    JobApplication updated = jobApplicationRepository.save(application);
+    return mapToJobApplicationDto(updated);
   }
 
   @Override
@@ -427,6 +435,16 @@ public class JobServiceImpl implements JobService {
     enriched.put("recommendation", buildMatchReason(matchData));
     enriched.put("reason", buildMatchReason(matchData));
     enriched.put("resumeId", jobMatch.getResumeId());
+    // Honest source label (see CLAUDE.md "Product decisions (locked)") — the AI service's
+    // job_aggregator now tags every result "adzuna" / a scraped-platform name / "sample".
+    // Falls back to the stored platform name for replayed/stored matches where the original
+    // AI response (and its source field) isn't available anymore.
+    Object source = matchData != null ? matchData.get("source") : null;
+    enriched.put(
+        "source",
+        source != null
+            ? source
+            : (job.getPlatform() != null ? job.getPlatform().toLowerCase() : "unknown"));
     return enriched;
   }
 

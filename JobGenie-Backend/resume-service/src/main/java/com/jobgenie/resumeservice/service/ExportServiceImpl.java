@@ -326,14 +326,14 @@ public class ExportServiceImpl implements ExportService {
     Object value = metadata.get(key);
     if (value != null) {
       html.append("<div class='section'>");
-      html.append("<h2>").append(sectionTitle).append("</h2>");
+      html.append("<h2>").append(htmlEscape(sectionTitle)).append("</h2>");
       if (value instanceof List) {
         List<?> items = (List<?>) value;
         for (Object item : items) {
-          html.append("<p>").append(item.toString()).append("</p>");
+          html.append("<p>").append(htmlEscape(itemToDisplayText(item))).append("</p>");
         }
       } else {
-        html.append("<p>").append(value.toString()).append("</p>");
+        html.append("<p>").append(htmlEscape(itemToDisplayText(value))).append("</p>");
       }
       html.append("</div>");
     }
@@ -344,17 +344,61 @@ public class ExportServiceImpl implements ExportService {
     Object value = metadata.get(key);
     if (value != null) {
       html.append("<div class='ats-section'>");
-      html.append("<h2>").append(sectionTitle).append("</h2>");
+      html.append("<h2>").append(htmlEscape(sectionTitle)).append("</h2>");
       if (value instanceof List) {
         List<?> items = (List<?>) value;
         for (Object item : items) {
-          html.append("<p>").append(item.toString()).append("</p>");
+          html.append("<p>").append(htmlEscape(itemToDisplayText(item))).append("</p>");
         }
       } else {
-        html.append("<p>").append(value.toString()).append("</p>");
+        html.append("<p>").append(htmlEscape(itemToDisplayText(value))).append("</p>");
       }
       html.append("</div>");
     }
+  }
+
+  /**
+   * Resume/education/experience entries are sometimes plain strings and sometimes {@code
+   * {"description": "..."}} objects (see the AI service's heuristic parser) — calling {@code
+   * .toString()} directly on the latter produced literal Java Map syntax ({@code
+   * {description=...}}) in exported PDFs instead of the actual text. Extracts the real content
+   * either way.
+   */
+  @SuppressWarnings("unchecked")
+  private String itemToDisplayText(Object item) {
+    if (item instanceof Map) {
+      Map<String, Object> map = (Map<String, Object>) item;
+      Object description = map.get("description");
+      if (description != null) {
+        return description.toString();
+      }
+      // No "description" key — join whatever string-ish values exist rather than
+      // falling back to Map.toString()'s {key=value} syntax.
+      StringBuilder joined = new StringBuilder();
+      for (Object v : map.values()) {
+        if (v != null) {
+          if (joined.length() > 0) {
+            joined.append(" ");
+          }
+          joined.append(v);
+        }
+      }
+      return joined.length() > 0 ? joined.toString() : "";
+    }
+    return item != null ? item.toString() : "";
+  }
+
+  /** Minimal HTML-escaping so resume content with &lt;, &gt;, or &amp; can't break the
+   * generated markup structure before it's converted to PDF. */
+  private String htmlEscape(String text) {
+    if (text == null) {
+      return "";
+    }
+    return text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br/>");
   }
 
   private String getStringValue(Map<String, Object> map, String key, String defaultValue) {

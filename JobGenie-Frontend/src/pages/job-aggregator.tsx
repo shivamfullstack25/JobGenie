@@ -41,6 +41,9 @@ interface JobListing {
   companyRating?: number;
   applicantCount?: number;
   views?: number;
+  // Honest source labeling from job_aggregator.py's Adzuna/cache/sample rebuild. May be absent
+  // on older cached results — degrade gracefully when it is.
+  source?: string;
 }
 
 interface SearchFilters {
@@ -149,47 +152,44 @@ export default function JobAggregator() {
     }
   });
 
-  const autoApplyMutation = useMutation({
-    // There is no /api/job-aggregator/auto-apply endpoint on any backend service — this used to
-    // POST straight into a 404. Route through job-service's real /api/jobs/apply instead (same
-    // endpoint job-matches.tsx's "Auto Apply" uses), which persists each application and fetches
-    // the actual resume content for the AI auto-apply call.
-    mutationFn: async (jobIds: string[]) => {
+  // Click-out apply: JobGenie never applies on the user's behalf (see CLAUDE.md "Product
+  // decisions (locked)"). Applying opens the job's real URL in a new tab and logs a manual
+  // application record via job-service's /api/jobs/apply (resumeId is now optional there).
+  //
+  // Bulk "apply" UX decision: opening N `window.open` calls back-to-back inside one click
+  // handler gets popup-blocked by every mainstream browser beyond the first one or two tabs, and
+  // logging an application for a job whose page was never opened would be dishonest (the whole
+  // point of this rebuild is to stop claiming things happened that didn't). So bulk apply is a
+  // "step through your selection" flow: each click opens exactly one job (a genuine user
+  // gesture, so it's never blocked), logs that one application, and removes it from the
+  // selection — the button's label shows how many are left so the user can click through the
+  // rest at their own pace.
+  const applyMutation = useMutation({
+    mutationFn: async (jobId: string) => {
       if (!backendUser?.id) {
         throw new Error('Please log in to apply to jobs');
       }
-      if (!effectiveResumeId) {
-        throw new Error('Upload a resume before auto-applying');
+      const job = jobListings.find((j) => j.id === jobId);
+      if (job?.url) {
+        window.open(job.url, '_blank', 'noopener,noreferrer');
       }
-      const outcomes = await Promise.allSettled(
-        jobIds.map((jobId) =>
-          jobAPI.applyToJob(jobId, backendUser.id.toString(), effectiveResumeId),
-        ),
-      );
-      const succeeded = outcomes.filter((o) => o.status === 'fulfilled').length;
-      const failed = outcomes.length - succeeded;
-      if (succeeded === 0 && failed > 0) {
-        const firstError = outcomes.find(
-          (o): o is PromiseRejectedResult => o.status === 'rejected',
-        );
-        throw new Error(firstError?.reason?.message || 'Auto-apply failed');
-      }
-      return { succeeded, failed };
+      return jobAPI.applyToJob(jobId, backendUser.id.toString(), effectiveResumeId || undefined);
     },
-    onSuccess: ({ succeeded, failed }: { succeeded: number; failed: number }) => {
-      setSelectedJobs(new Set());
+    onSuccess: (_data, jobId) => {
+      setSelectedJobs((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
       toast({
-        title: 'Auto-Apply Complete',
-        description:
-          failed > 0
-            ? `${succeeded} application(s) submitted, ${failed} failed`
-            : `${succeeded} application(s) submitted`,
+        title: 'Application logged',
+        description: 'Marked as applied — finish the application in the tab that just opened.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Auto-apply failed',
-        description: error?.message || 'Could not submit applications',
+        title: "Couldn't log application",
+        description: error?.message || 'Could not record this application',
         variant: 'destructive',
       });
     },
@@ -199,17 +199,20 @@ export default function JobAggregator() {
     searchMutation.mutate(searchFilters);
   };
 
-  const handleAutoApply = (jobId?: string) => {
+  // Applies to one job (the per-card button), or — with no jobId — the next job in the current
+  // bulk selection (the "Open & Log Next" button; see the step-through comment above).
+  const handleApply = (jobId?: string) => {
     if (!backendUser?.isEmailVerified) {
       toast({
         title: "Email verification required",
-        description: "Please verify your email to use this feature.",
+        description: "Please verify your email to log applications.",
         variant: "destructive",
       });
       return;
     }
-    const jobsToApply = jobId ? [jobId] : Array.from(selectedJobs);
-    autoApplyMutation.mutate(jobsToApply);
+    const target = jobId ?? Array.from(selectedJobs)[0];
+    if (!target) return;
+    applyMutation.mutate(target);
   };
 
   const getMatchScoreColor = (score: number) => {
@@ -244,11 +247,11 @@ export default function JobAggregator() {
           Job Search Aggregator
         </h1>
         <p className="text-gray-600 text-lg">
-          Find the best jobs across all major platforms with AI-powered matching and analytics
+          Find jobs across all major platforms with keyword-based matching and analytics
         </p>
       </div>
 
-      <EmailVerificationBanner message="Please verify your email to auto-apply to jobs. Searching and browsing stay available either way." />
+      <EmailVerificationBanner message="Please verify your email to apply to jobs. Searching and browsing stay available either way." />
 
       {/* Search Filters */}
       <Card className="mb-6">
@@ -408,12 +411,13 @@ export default function JobAggregator() {
             </span>
             {selectedJobs.size > 0 && (
               <Button
-                onClick={() => handleAutoApply()}
+                onClick={() => handleApply()}
                 className="bg-green-600 hover:bg-green-700"
-                disabled={autoApplyMutation.isPending || !backendUser?.isEmailVerified}
+                disabled={applyMutation.isPending || !backendUser?.isEmailVerified}
+                title="Opens one job at a time — browsers block multiple tabs opened at once"
               >
                 <Zap className="h-4 w-4 mr-2" />
-                Auto-Apply to {selectedJobs.size} Jobs
+                Open &amp; Log Next ({selectedJobs.size} selected)
               </Button>
             )}
           </div>
@@ -454,8 +458,13 @@ export default function JobAggregator() {
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-xl font-semibold text-gray-900">{job.title}</h3>
                       <Badge className={`${getMatchScoreColor(job.matchingScore)} font-semibold`}>
-                        {job.matchingScore}% Match
+                        {job.matchingScore}% Keyword Match
                       </Badge>
+                      {job.source && (
+                        <Badge variant="outline" className="text-xs text-gray-500">
+                          via {job.source}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-gray-600 mb-3">
                       <span className="font-medium">{job.company}</span>
@@ -535,12 +544,12 @@ export default function JobAggregator() {
                     View on {job.platform}
                   </Button>
                   <Button
-                    onClick={() => handleAutoApply(job.id)}
+                    onClick={() => handleApply(job.id)}
                     className="flex-1 bg-green-600 hover:bg-green-700"
-                    disabled={autoApplyMutation.isPending || !backendUser?.isEmailVerified}
+                    disabled={applyMutation.isPending || !backendUser?.isEmailVerified}
                   >
                     <Zap className="h-4 w-4 mr-2" />
-                    Auto-Apply
+                    Apply on {job.platform}
                   </Button>
                 </div>
               </CardContent>

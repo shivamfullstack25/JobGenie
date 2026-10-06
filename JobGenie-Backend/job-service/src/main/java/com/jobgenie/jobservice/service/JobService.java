@@ -16,6 +16,9 @@ public interface JobService {
   List<com.jobgenie.shared.dto.JobApplicationDto> getUserApplications(
       String userId, int page, int size);
 
+  com.jobgenie.shared.dto.JobApplicationDto updateApplicationStatus(
+      Long applicationId, String userId, String status);
+
   java.util.Map<String, Object> startAutomation(
       String userId, java.util.Map<String, Object> config);
 

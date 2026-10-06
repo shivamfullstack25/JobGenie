@@ -81,7 +81,10 @@ CREATE TABLE IF NOT EXISTS job_applications (
     id BIGSERIAL PRIMARY KEY,
     job_id VARCHAR(255) NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    resume_id VARCHAR(255) NOT NULL,
+    -- Nullable: JobGenie is a click-out product (see CLAUDE.md "Product decisions (locked)")
+    -- — applying is just logging that the user went to the destination site, no resume
+    -- required to record it.
+    resume_id VARCHAR(255),
     cover_letter_id VARCHAR(255),
     application_status VARCHAR(50) DEFAULT 'submitted',
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -5,7 +5,6 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Badge} from "@/components/ui/badge";
-import {Alert, AlertDescription} from "@/components/ui/alert";
 import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
 import Navigation from "@/components/navigation";
@@ -23,7 +22,7 @@ export default function Automation() {
   const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
   const [frequency, setFrequency] = useState("daily");
   const [platforms, setPlatforms] = useState<string[]>([]);
-  const [maxApplications, setMaxApplications] = useState(5);
+  const [maxJobsPerSearch, setMaxJobsPerSearch] = useState(20);
   const [keywords, setKeywords] = useState("");
   const [preferredLocations, setPreferredLocations] = useState<string[]>([]);
   const [salaryMin, setSalaryMin] = useState("500000");
@@ -33,13 +32,6 @@ export default function Automation() {
   const [jobType, setJobType] = useState("full-time");
   const [remotePreference, setRemotePreference] = useState("any");
   const [isExtractingSkills, setIsExtractingSkills] = useState(false);
-
-  // Platform credentials
-  const [credentials, setCredentials] = useState({
-    linkedin: { username: "", password: "" },
-    indeed: { username: "", password: "" },
-    naukri: { username: "", password: "" },
-  });
 
   const { data: resumes = [] } = useQuery({
     queryKey: ["resumes", backendUser?.id],
@@ -94,8 +86,8 @@ export default function Automation() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Automation Complete",
-        description: `Found ${data.jobsFound} jobs, submitted ${data.applicationsSubmitted} applications`,
+        title: "Search Complete",
+        description: `Found ${data.jobsFound} jobs — review and apply from Job Matches`,
       });
       // Match by prefix since the query key now carries ?userId=... (see schedules useQuery above).
       queryClient.invalidateQueries({
@@ -108,35 +100,6 @@ export default function Automation() {
       toast({
         title: "Automation Failed",
         description: error.message || "Failed to run automation",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const runBrowserBotMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("/api/automation/browser-automation", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Browser Bot Complete",
-        description: `Successfully applied to ${data.applicationsSubmitted} jobs across ${platforms.length} platforms`,
-      });
-      // Match by prefix since the query key now carries ?userId=... (see schedules useQuery above).
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          (query.queryKey[0] as string).startsWith("/api/automation/schedules"),
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Browser Bot Failed",
-        description: error.message || "Failed to run browser automation",
         variant: "destructive",
       });
     },
@@ -185,17 +148,12 @@ export default function Automation() {
     setSelectedResumeId(null);
     setFrequency("daily");
     setPlatforms([]);
-    setMaxApplications(5);
+    setMaxJobsPerSearch(20);
     setKeywords("");
     setPreferredLocations([]);
     setSalaryMin("500000");
     setSalaryMax("1500000");
     setSalaryCurrency("INR");
-    setCredentials({
-      linkedin: { username: "", password: "" },
-      indeed: { username: "", password: "" },
-      naukri: { username: "", password: "" },
-    });
   };
 
   const handlePlatformToggle = (platform: string) => {
@@ -204,16 +162,6 @@ export default function Automation() {
         ? prev.filter(p => p !== platform)
         : [...prev, platform]
     );
-  };
-
-  const handleCredentialChange = (platform: string, field: string, value: string) => {
-    setCredentials(prev => ({
-      ...prev,
-      [platform]: {
-        ...prev[platform as keyof typeof prev],
-        [field]: value
-      }
-    }));
   };
 
   const handleCreateSchedule = () => {
@@ -235,21 +183,6 @@ export default function Automation() {
       return;
     }
 
-    // Validate credentials for selected platforms
-    const missingCredentials = platforms.filter(platform => {
-      const creds = credentials[platform as keyof typeof credentials];
-      return !creds.username || !creds.password;
-    });
-
-    if (missingCredentials.length > 0) {
-      toast({
-        title: "Missing Credentials",
-        description: `Please provide credentials for: ${missingCredentials.join(", ")}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     const jobPreferences = {
       keywords: keywords.split(',').map(k => k.trim()).filter(k => k),
       locations: preferredLocations,
@@ -261,76 +194,12 @@ export default function Automation() {
       remotePreference,
     };
 
-    const platformCredentials = platforms.reduce((acc, platform) => {
-      acc[platform] = credentials[platform as keyof typeof credentials];
-      return acc;
-    }, {} as any);
-
     createScheduleMutation.mutate({
       resumeId: selectedResumeId,
       frequency,
       platforms,
       jobPreferences,
-      platformCredentials,
-      maxApplicationsPerRun: maxApplications,
-    });
-  };
-
-  const handleRunBrowserBotNow = () => {
-    if (!backendUser?.isEmailVerified) {
-      toast({
-        title: "Email verification required",
-        description: "Please verify your email to use this feature.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedResumeId || platforms.length === 0) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a resume and at least one platform",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate credentials for selected platforms
-    const missingCredentials = platforms.filter(platform => {
-      const creds = credentials[platform as keyof typeof credentials];
-      return !creds.username || !creds.password;
-    });
-
-    if (missingCredentials.length > 0) {
-      toast({
-        title: "Missing Credentials",
-        description: `Please provide credentials for: ${missingCredentials.join(", ")}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const searchCriteria = {
-      keywords: keywords.split(',').map(k => k.trim()).filter(k => k),
-      location: preferredLocations,
-      salaryMin: salaryMin ? parseInt(salaryMin) : undefined,
-      salaryMax: salaryMax ? parseInt(salaryMax) : undefined,
-      experienceLevel,
-      jobType,
-      remotePreference,
-    };
-
-    const platformCredentials = platforms.reduce((acc, platform) => {
-      acc[platform] = credentials[platform as keyof typeof credentials];
-      return acc;
-    }, {} as any);
-
-    runBrowserBotMutation.mutate({
-      resumeId: selectedResumeId,
-      platforms,
-      searchCriteria,
-      platformCredentials,
-      maxApplications,
+      maxJobsPerSearch,
     });
   };
 
@@ -351,33 +220,28 @@ export default function Automation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <i className="fas fa-robot mr-3 text-primary-600"></i>
-            Job Search Automation
+            <i className="fas fa-clock mr-3 text-primary-600"></i>
+            Job Search Scheduling
           </h1>
           <p className="text-gray-600 mt-2">
-            Set up automated job searching and application submission across multiple platforms
+            Schedule a recurring job search across platforms — JobGenie finds jobs for you, you apply yourself on
+            each site, no credentials required
           </p>
 
           <EmailVerificationBanner
             className="mt-4"
-            message="Please verify your email to run automation or submit applications. You can still browse and configure a search below."
+            message="Please verify your email to schedule automated searches. You can still browse and configure a search below."
           />
 
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h3 className="font-semibold text-blue-900 mb-2 flex items-center">
               <i className="fas fa-info-circle mr-2"></i>
-              How Browser Automation Works
+              How This Works
             </h3>
             <div className="text-sm text-blue-800 space-y-2">
-              <p>• <strong>Real Browser Bot:</strong> Opens actual web browsers and navigates to job platforms like a human would</p>
-              <p>• <strong>Auto Login:</strong> Uses your credentials to log into Naukri, Indeed, LinkedIn automatically</p>
-              <p>• <strong>Smart Job Search:</strong> Searches for jobs based on your resume keywords and preferences</p>
-              <p>• <strong>Auto Apply:</strong> Fills and submits job applications using your resume data</p>
-              <p>• <strong>Real-time Updates:</strong> Get notifications for each successful application</p>
-              <div className="mt-3 p-2 bg-blue-100 rounded">
-                <p className="font-medium">🚀 "Run Browser Bot Now" starts immediately</p>
-                <p className="font-medium">📅 "Schedule Automation" runs daily at your preferred time</p>
-              </div>
+              <p>• <strong>Search only:</strong> JobGenie searches for jobs matching your keywords and preferences on a schedule — it never logs into LinkedIn, Indeed, or Naukri, and never stores third-party passwords</p>
+              <p>• <strong>You apply:</strong> Review the matches under Job Matches / Job Search and click through to apply on the actual job site yourself</p>
+              <p>• <strong>Schedule Automation</strong> sets up the recurring search; use "Run Now" on an existing schedule to search immediately</p>
             </div>
           </div>
         </div>
@@ -446,68 +310,18 @@ export default function Automation() {
                     </select>
                   </div>
                   <div>
-                    <Label>Max Applications per Run</Label>
+                    <Label>Max Jobs per Search</Label>
                     <Input
                       type="number"
-                      value={maxApplications}
-                      onChange={(e) => setMaxApplications(Number(e.target.value))}
+                      value={maxJobsPerSearch}
+                      onChange={(e) => setMaxJobsPerSearch(Number(e.target.value))}
                       min="1"
-                      max="20"
+                      max="100"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Platform Credentials */}
-            {platforms.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <i className="fas fa-key mr-2 text-orange-600"></i>
-                    Platform Credentials
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Alert>
-                    <i className="fas fa-shield-alt mr-2"></i>
-                    <AlertDescription>
-                      Your credentials are sent only for this automation run and are not saved to our
-                      database. Browser automation is not enabled in this deployment.
-                    </AlertDescription>
-                  </Alert>
-
-                  {platforms.map((platform) => (
-                    <div key={platform} className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-3 capitalize flex items-center">
-                        <i className={`fab fa-${platform} mr-2`}></i>
-                        {platform} Credentials
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>Username/Email</Label>
-                          <Input
-                            type="text"
-                            value={credentials[platform as keyof typeof credentials].username}
-                            onChange={(e) => handleCredentialChange(platform, 'username', e.target.value)}
-                            placeholder="your@email.com"
-                          />
-                        </div>
-                        <div>
-                          <Label>Password</Label>
-                          <Input
-                            type="password"
-                            value={credentials[platform as keyof typeof credentials].password}
-                            onChange={(e) => handleCredentialChange(platform, 'password', e.target.value)}
-                            placeholder="••••••••"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Job Preferences */}
             <Card>
@@ -635,42 +449,9 @@ export default function Automation() {
 
                 <div className="space-y-3">
                   <Button
-                    onClick={handleRunBrowserBotNow}
-                    disabled={
-                      runBrowserBotMutation.isPending ||
-                      !selectedResumeId ||
-                      platforms.length === 0 ||
-                      !backendUser?.isEmailVerified
-                    }
-                    className="w-full bg-orange-600 hover:bg-orange-700"
-                  >
-                    {runBrowserBotMutation.isPending ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin mr-2"></i>
-                        Running Browser Bot...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-rocket mr-2"></i>
-                        Run Browser Bot Now
-                      </>
-                    )}
-                  </Button>
-                  
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white px-2 text-muted-foreground">or</span>
-                    </div>
-                  </div>
-
-                  <Button
                     onClick={handleCreateSchedule}
                     disabled={createScheduleMutation.isPending || !backendUser?.isEmailVerified}
                     className="w-full bg-primary-600 hover:bg-primary-700"
-                    variant="outline"
                   >
                     {createScheduleMutation.isPending ? (
                       <>
@@ -757,9 +538,7 @@ export default function Automation() {
 
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Last result:</span>
-                            <span>
-                              {schedule.lastJobsFound || 0} jobs, {schedule.lastApplicationsSubmitted || 0} applied
-                            </span>
+                            <span>{schedule.lastJobsFound || 0} jobs found</span>
                           </div>
 
                           {schedule.jobPreferences?.keywords && (

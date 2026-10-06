@@ -19,7 +19,13 @@ interface JobMatchCardProps {
     matchingSkills?: string[];
     missingSkills?: string[];
     recommendation?: string;
+    // Honest source labeling — added by the Adzuna/job_aggregator rebuild. May be absent on
+    // older cached results; degrade gracefully when it is.
+    source?: string;
   };
+  // Fired immediately after the click-out window opens, so the caller can log the manual
+  // application (POST /api/jobs/apply). No separate confirmation step — opening the real job
+  // URL IS the application action from the user's perspective.
   onApply?: () => void;
   onSave?: () => void;
   saving?: boolean;
@@ -36,15 +42,40 @@ export default function JobMatchCard({ job, onApply, onSave, saving, applying }:
   const matchScore = job.matchScore || job.matchPercentage || 0;
   const jobId = job.id || job.jobId;
 
+  const formatSource = (source: string) => {
+    const known: Record<string, string> = {
+      adzuna: "Adzuna",
+      cache: "cached",
+      sample: "sample data",
+    };
+    return known[source.toLowerCase()] || source;
+  };
+
+  const handleApplyClick = () => {
+    // Click-out: open the real job listing in a new tab — the user completes the actual
+    // application there, in their own logged-in session. JobGenie never holds the pen.
+    if (job.url) {
+      window.open(job.url, "_blank", "noopener,noreferrer");
+    }
+    // Log the manual application immediately — opening the real site is the application
+    // action; there's no separate confirmation step.
+    onApply?.();
+  };
+
   return (
     <div className="p-6 hover:bg-gray-50 transition-colors duration-150">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center space-x-3 mb-2">
+          <div className="flex items-center flex-wrap gap-2 mb-2">
             <h4 className="text-lg font-semibold text-gray-900">{job.title}</h4>
             <Badge className={getMatchColor(matchScore)}>
-              {matchScore}% Match
+              {matchScore}% Keyword Match
             </Badge>
+            {job.source && (
+              <Badge variant="outline" className="text-xs text-gray-500">
+                via {formatSource(job.source)}
+              </Badge>
+            )}
           </div>
           <p className="text-gray-600 font-medium mb-1">{job.company}</p>
           <p className="text-gray-500 text-sm mb-3">
@@ -101,10 +132,10 @@ export default function JobMatchCard({ job, onApply, onSave, saving, applying }:
           {onApply && (
             <Button
               className="bg-primary-600 hover:bg-primary-700"
-              onClick={onApply}
+              onClick={handleApplyClick}
               disabled={applying}
             >
-              {applying ? "Applying..." : "Auto Apply"}
+              {applying ? "Logging..." : job.platform ? `Apply on ${job.platform}` : "Apply"}
             </Button>
           )}
           <Button

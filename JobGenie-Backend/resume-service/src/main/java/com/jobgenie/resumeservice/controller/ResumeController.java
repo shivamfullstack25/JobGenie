@@ -315,6 +315,12 @@ public class ResumeController {
     log.info("Optimizing resume for ATS");
     try {
       String resumeContent = (String) request.get("resumeContent");
+      if (resumeContent == null || resumeContent.isBlank()) {
+        // Map.of() downstream in AIServiceClient throws a bare NullPointerException on a
+        // null value — validate here first so a missing field is a clear 400, not an
+        // opaque "AI service call failed" 500.
+        return ResponseEntity.badRequest().body(Map.of("error", "resumeContent is required"));
+      }
       String jobDescription = (String) request.get("jobDescription");
       Integer targetScore = (Integer) request.get("targetScore");
 

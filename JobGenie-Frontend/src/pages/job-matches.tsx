@@ -105,12 +105,15 @@ export default function JobMatches() {
     }
   };
 
+  // Click-out apply: JobMatchCard already opened the job's real URL in a new tab before calling
+  // this — here we just log the manual application so it shows up in application history.
+  // resumeId is optional per the /api/jobs/apply contract, so we no longer block on having one.
   const handleApplyJob = async (job: any) => {
     if (!backendUser?.id) return;
     if (!backendUser.isEmailVerified) {
       toast({
         title: "Email verification required",
-        description: "Please verify your email to apply to jobs.",
+        description: "Please verify your email to log applications.",
         variant: "destructive",
       });
       return;
@@ -120,22 +123,14 @@ export default function JobMatches() {
       toast({ title: "Error", description: "Job ID missing", variant: "destructive" });
       return;
     }
-    if (!effectiveResumeId) {
-      toast({
-        title: "No resume found",
-        description: "Upload a resume before applying to jobs.",
-        variant: "destructive",
-      });
-      return;
-    }
     setApplyingJobId(String(jobId));
     try {
-      await jobAPI.applyToJob(String(jobId), backendUser.id.toString(), effectiveResumeId);
-      toast({ title: "Application submitted", description: `Applied to ${job.title}` });
+      await jobAPI.applyToJob(String(jobId), backendUser.id.toString(), effectiveResumeId || undefined);
+      toast({ title: "Application logged", description: `Marked ${job.title} as applied` });
     } catch (e: any) {
       toast({
-        title: "Apply failed",
-        description: e?.message || "Could not submit application",
+        title: "Couldn't log application",
+        description: e?.message || "Could not record this application",
         variant: "destructive",
       });
     } finally {
@@ -196,7 +191,7 @@ export default function JobMatches() {
 
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
               <CardHeader>
-                <CardTitle>AI Job Matching</CardTitle>
+                <CardTitle>Job Matching</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -218,7 +213,7 @@ export default function JobMatches() {
                   className="w-full" 
                   disabled={matchesLoading}
                 >
-                  {matchesLoading ? "Generating..." : "Generate AI Matches"}
+                  {matchesLoading ? "Generating..." : "Generate Matches"}
                 </Button>
               </CardContent>
             </Card>
@@ -248,7 +243,7 @@ export default function JobMatches() {
             {jobMatches.length > 0 && (
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  AI-Recommended Matches ({jobMatches.length})
+                  Keyword Matches ({jobMatches.length})
                 </h2>
                 <div className="space-y-4">
                   {jobMatches.map((job: any) => (

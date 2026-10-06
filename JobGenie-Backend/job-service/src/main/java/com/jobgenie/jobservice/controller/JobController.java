@@ -151,13 +151,17 @@ public class JobController {
 
   @PostMapping("/apply")
   @Operation(
-      summary = "Apply to a job",
-      description = "Submit job application with resume and cover letter")
+      summary = "Log a job application",
+      description =
+          "Record that the user applied to a job. JobGenie is a metasearch/click-out product"
+              + " (see CLAUDE.md) — the user applies on the destination site themselves; this"
+              + " just tracks it in their history. No AI or browser automation involved.")
   public ResponseEntity<JobApplicationDto> applyToJob(
       @Parameter(description = "Job ID") @RequestParam String jobId,
       @Parameter(description = "User ID") @RequestParam String userId,
-      @Parameter(description = "Resume ID") @RequestParam String resumeId,
-      @Parameter(description = "Cover letter ID") @RequestParam(required = false)
+      @Parameter(description = "Resume ID used, if any") @RequestParam(required = false)
+          String resumeId,
+      @Parameter(description = "Cover letter ID, if any") @RequestParam(required = false)
           String coverLetterId) {
     log.info(
         "Applying to job with jobId={}, userId={}, resumeId={}, coverLetterId={}",
@@ -189,6 +193,25 @@ public class JobController {
     List<JobApplicationDto> applications = jobService.getUserApplications(userId, page, size);
     log.info("Successfully got applications for userId={}, page={}, size={}", userId, page, size);
     return ResponseEntity.ok(applications);
+  }
+
+  @PatchMapping("/applications/{applicationId}/status")
+  @Operation(
+      summary = "Update application status",
+      description =
+          "Move a logged application through the tracker: APPLIED, INTERVIEWING, OFFER,"
+              + " REJECTED, or WITHDRAWN.")
+  public ResponseEntity<JobApplicationDto> updateApplicationStatus(
+      @PathVariable Long applicationId,
+      @Parameter(description = "User ID") @RequestParam String userId,
+      @Parameter(description = "New status") @RequestParam String status) {
+    log.info(
+        "Updating application status: applicationId={}, userId={}, status={}",
+        applicationId,
+        userId,
+        status);
+    JobApplicationDto updated = jobService.updateApplicationStatus(applicationId, userId, status);
+    return ResponseEntity.ok(updated);
   }
 
   @PostMapping("/saved")

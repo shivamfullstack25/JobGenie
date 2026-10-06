@@ -21,7 +21,6 @@ export default function Navigation() {
     { path: "/application-history", label: "History", icon: "📋" },
     { path: "/resume-assistant", label: "AI Assistant", icon: "🤖" },
     { path: "/automation", label: "Automation", icon: "⚡" },
-    { path: "/market-intelligence", label: "Insights", icon: "📊" },
     { path: "/about", label: "About", icon: "ℹ️" },
   ];
   if (isAdmin) {
@@ -29,12 +28,14 @@ export default function Navigation() {
     mainNavItems.push({ path: "/analytics", label: "Analytics", icon: "📈" });
   }
 
+  // Secondary "Tools" area — demoted per CLAUDE.md's KEEP/CUT/REBUILD table (these pages stay,
+  // they just don't get primary nav real estate).
   const toolsItems = [
     { path: "/ats-generator", label: "ATS Generator" },
     { path: "/cover-letters", label: "Cover Letters" },
     { path: "/job-aggregator", label: "Job Search" },
     { path: "/career-mentor", label: "Career Mentor" },
-    { path: "/real-automation", label: "Browser Bot" },
+    { path: "/market-intelligence", label: "Market Intelligence" },
   ];
 
   const displayName =

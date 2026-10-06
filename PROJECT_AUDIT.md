@@ -1,0 +1,287 @@
+# JobGenie — Project Audit (Phase 0)
+
+**Date:** 2026-10-06 · **Scope:** whole repository, working tree as found (25 modified files uncommitted on `main`) · **Method:** source read, not filename inference.
+
+**What was and was not verified.** Every claim below comes from reading the implementation. Two things were executed: the frontend test suite (fails, see §14) and `docker compose ps` (Docker Desktop was not running). Nothing was verified against a live stack in this audit; where CLAUDE.md says a path was "verified live" on 2026-08-23, that is carried forward as a prior claim, not re-confirmed.
+
+Classification key: **KEEP** (works, leave alone) · **REFACTOR** (right idea, wrong internals) · **EXTEND** (sound base, add to it) · **REPLACE** (wrong approach) · **DEPRECATE** (remove on a schedule).
+
+---
+
+## Headline findings
+
+1. **There is no authentication on any API.** The gateway is `permitAll()` on every path, no backend service has Spring Security, the AI service has no auth, and the frontend never sends an `Authorization` header. Identity is whatever `userId` the caller puts in the query string. This must be fixed before a canonical CandidateProfile holding visa status, salary and contact data is built on top. Details in §13 and §16.
+2. **The AI service's source code is not in git.** `.gitignore:378` (`app/`) ignores `JobGenie-AI/app/`, so 6,000 lines (CrewAI service, job aggregator, scheduler, notifications) exist only on this machine. A fresh clone cannot build the AI container, and CI compiles `main.py` without them.
+3. **There are zero passing automated tests.** No Java tests, no Python tests, and the single frontend test cannot be parsed (no TypeScript transform configured). "Existing tests must continue to pass" currently has nothing to hold.
+4. **The core loop is real and reusable.** Resume upload → text extraction → LLM/heuristic parse → Postgres → keyword-matched job search → save → manual application tracking is implemented end to end and is the base to extend.
+5. **Job identity is unstable for scraped sources**, which corrupts saved jobs and applications (§8, §19).
+6. **No resume or profile documents exist in the workspace.** The instruction to inspect them could not be satisfied; `/profile/master-profile.yaml` cannot be populated with real facts until one is supplied.
+
+---
+
+## 1. Current architecture
+
+Browser → API Gateway (Spring Cloud Gateway, reactive, :8080) → four Spring Boot services discovered through Eureka → FastAPI AI service (:8000) → LLM provider and external job sources. One Postgres 15 instance hosts five logical databases; Redis is used by the gateway (threat state) and the AI service (job-search cache). Kafka is wired but disabled. Full map in `ARCHITECTURE_MAP.md`.
+
+**Classification: KEEP the service boundaries.** They are sound and CLAUDE.md forbids collapsing them. **REFACTOR** what flows across them (identity, contracts).
+
+## 2. Technology stack
+
+| Layer | Stack | Note |
+|---|---|---|
+| Frontend | React 18, Vite 5, TypeScript, Tailwind, Radix/shadcn, TanStack Query v4, wouter, Firebase JS SDK | MUI and Emotion are also installed; two UI kits |
+| Gateway | Spring Boot 2.7.18, Spring Cloud 2021.0.8, WebFlux, Resilience4j, Bucket4j | Boot 2.7 is past OSS end of life |
+| Services | Spring Boot 2.7.18, JPA/Hibernate 5 (`hibernate-types` for JSONB), Lombok, springdoc | `ddl-auto=update` everywhere |
+| AI | Python 3.11, FastAPI, CrewAI 1.15.17, aiohttp, BeautifulSoup, APScheduler, PyPDF2, python-docx | LangChain installed, mostly unused on live paths |
+| Data | Postgres 15, Redis 7 | No migration tool |
+| Infra | docker-compose, GitHub Actions (build only) | No deploy |
+
+## 3. Modules
+
+| Module | Lines (approx.) | State |
+|---|---|---|
+| `JobGenie-Frontend/` | 95 TSX files | Working; 19 routes |
+| `api-gateway` | 16 classes | Routes work; security filters are heuristic only |
+| `user-service` | 20 classes | Works; auth is unsafe |
+| `job-service` | 17 classes | Works; schedule endpoints partly broken |
+| `resume-service` | 17 classes | Works |
+| `notification-service` | 8 classes | Stateless email/SMS/push stubs; no DB |
+| `shared` | 10 entities, 5 DTOs | 3 entities unused |
+| `eureka-server` | 1 class | Works |
+| `JobGenie-AI/main.py` | 1,605 | 60 endpoints; tracked |
+| `JobGenie-AI/app/**` | ~6,000 | **Untracked** |
+
+## 4. APIs
+
+Around 110 HTTP endpoints. Full inventory by boundary in `ARCHITECTURE_MAP.md` §3. Patterns that matter:
+
+- Every user-scoped endpoint takes `userId` as a request parameter, path variable or body field.
+- Resume endpoints keyed by `resumeId` do no ownership check at all.
+- Controllers use `Map<String,Object>` request bodies widely, so contracts are implicit. The frontend `aiAPI` helpers send snake_case (`resume_text`) to controllers that read camelCase (`resumeText`); those helpers are unused dead code, the pages call `apiRequest` directly.
+- `SwaggerController` (594 lines) and `ApiDocumentationController` hand-write API docs that still describe removed auto-apply endpoints. springdoc already generates real ones per service.
+
+**Classification: REFACTOR** (typed DTOs, identity from token). **DEPRECATE** the hand-written Swagger controllers.
+
+## 5. Database schema
+
+Five databases: `jobgenie_users`, `jobgenie_jobs`, `jobgenie_resumes`, `jobgenie_notifications`, `jobgenie_ai` (empty).
+
+**The schema that actually runs is Hibernate's, not the SQL scripts.** `sql/init-databases.sql` creates tables that disagree with the entities, and `ddl-auto=update` then adds what the entities need:
+
+| Table | SQL script | JPA entity |
+|---|---|---|
+| `users` (users DB) | `firebase_uid NOT NULL`, `display_name`, `preferences` | `name NOT NULL`, `settings`, `is_email_verified`, `first_name`… |
+| `job_applications` | `application_status`, no `platform` | `status NOT NULL`, `platform NOT NULL` |
+| `jobs.required_skills` | JSONB column | `@ElementCollection` → separate `job_required_skills` table |
+| `resumes` | `parsed_content`, `ats_score`, `file_path` | `content`, `insights`, `original_file_name` |
+| `cover_letters`, `ats_resumes`, `user_sessions`, `notifications`, `notification_templates` | Created | **No entity, no code reads or writes them** |
+
+Other facts: `users` exists twice (authoritative in `jobgenie_users`; stub rows auto-inserted into `jobgenie_resumes` on first upload as `user{id}@jobgenie.local`). IDs are inconsistent: `job_applications.user_id` is VARCHAR, `saved_jobs.user_id` and `job_matches.user_id` are BIGINT. `audit_logs` has only `userId, action, details, timestamp`. No GIN indexes on JSONB.
+
+**Classification: KEEP Postgres and the per-service databases. REPLACE `ddl-auto=update` + drifting SQL with Flyway. EXTEND with the new entities.**
+
+## 6. Agents
+
+`CrewAIService` builds seven CrewAI `Agent` objects, each a role prompt with no tools, no memory and no delegation: resume_analyzer, cover_letter_writer, job_analyst, ats_optimizer, career_mentor, job_searcher, application_automator. Each request runs a one-agent, one-task crew, so in practice these are prompt templates behind an agent API. The last two are never invoked. `SchedulerAgent` has an eighth agent used only by a code path that always throws (§19).
+
+Five further "agent" modules are dead code: `enhanced_crew_ai_service.py`, `memory_manager.py`, `llm_optimizer.py`, `job_search_agent.py` are imported by nothing; `enhanced_job_matcher.py` is imported but needs OpenAI embeddings and `faiss`/`numpy` that the Docker image lacks, so it degrades to `None` and its endpoint returns 503.
+
+**Classification: REFACTOR.** Keep the provider chain and the heuristic fallbacks; replace free-text CrewAI tasks with schema-validated structured calls. **DEPRECATE** the four unreferenced modules.
+
+## 7. AI functionality
+
+| Capability | Path | With LLM | Without LLM |
+|---|---|---|---|
+| Resume parse | `/ai/resume/analyze`, `/api/resume-insights` | Free-text JSON, best-effort extraction | Regex/keyword heuristic, honestly labeled |
+| ATS optimize | `/api/ats-resume` | Free text in `raw_result` | Keyword-gap report |
+| Cover letter | `/api/generate-cover-letter` | Free text | Template |
+| Career chat | `/api/chat`, `/api/career-mentor/chat` | Free text | Canned reply |
+| Market intelligence | `/api/market-intelligence/*` | Not used | Heuristic, `isSampleData: true` |
+| Interview prep, career plan, gap analysis | `/api/career-mentor/*` | Not used | Static templates, labeled |
+
+LLM selection (`select_llm`) is Groq → Gemini → OpenAI → Ollama, all through CrewAI's OpenAI-compatible dispatch. Anthropic and OpenRouter are not supported.
+
+Problems: no structured output (`_extract_json_from_text` scrapes braces out of prose); the cover-letter prompt asks for "specific examples and achievements" and "research about the company" with no source data, which invites fabrication; each wrapper class (`CareerMentor`, `MarketIntelligence`, …) constructs its own `CrewAIService` and re-runs `initialize()` on **every request**, costing one validation LLM call plus seven agent builds each time; no response caching; resume upload calls the same LLM analysis **twice** (`extractMetadata` and `generateInsights` both hit `/api/resume-insights`).
+
+**Classification: REFACTOR** behind an `LLMProvider` abstraction with JSON-schema outputs. **KEEP** the heuristic fallbacks and their honest labels.
+
+## 8. Job sources
+
+`JobAggregator.search_jobs`: Redis cache (15 min) → Adzuna API if keyed → five HTML scrapers (LinkedIn, Indeed, Naukri, Glassdoor, Monster) → labeled sample jobs.
+
+- **Adzuna** is implemented correctly but no key is configured, so it has never run here. Its terms require a visible "Adzuna" attribution and restrict commercial use past a 14-day trial; the UI shows neither.
+- **The scrapers violate the terms of the sites they fetch** (see `docs/platform-compliance.md`) and are fragile: static CSS class selectors against JavaScript-rendered, bot-protected pages. Expect them to return nothing most of the time, which means the live experience without an Adzuna key is the sample jobs.
+- On a cache miss the scrape still runs **inside the request** (bounded at 8 s per platform). CLAUDE.md describes this as "off the request path"; it is time-boxed, not off-path.
+- **Scraped job IDs are positional**: `linkedin_0`, `indeed_3`. `job-service` upserts on that ID, so `linkedin_0` is overwritten by a different job on every search. A saved job or logged application keyed `linkedin_0` silently points at whatever was scraped last.
+- `posted_date` for scraped jobs is always today. Dedup is exact `title+company` match.
+- `/api/job-aggregator/stats` returns hardcoded numbers with no sample flag.
+
+**Classification: REFACTOR** into a `JobSourceAdapter` interface. **KEEP** the Adzuna adapter and the cache. **DEPRECATE** the five HTML scrapers in favour of public ATS feeds (Greenhouse, Lever, Ashby, SmartRecruiters).
+
+## 9. Resume functionality
+
+Works: PDF (PDFBox), DOCX (POI), TXT upload; text stored; parsed fields stored as JSONB; user can review and correct parsed data (`PUT /api/resumes/parsed`); PDF/JSON/ZIP export (iText html2pdf); ATS export.
+
+Gaps: the original file bytes are discarded, only extracted text is kept; no versioning (the review edit overwrites in place); no provenance on any field; `deleteResume` is a soft delete, which means account deletion leaves resume text in the database; uploading never deactivates older resumes, and "latest" is `list.get(0)` with no ordering; parse runs synchronously inside a DB transaction; text extraction is duplicated in Java and Python; `.doc` rejected.
+
+**Classification: EXTEND.** Reuse `FileProcessor`, `ExportServiceImpl`, `Resume`; add `ResumeVersion`, file storage, and profile linkage.
+
+## 10. Profile functionality
+
+`User` carries name, email, phone, bio, location, website, LinkedIn URL, GitHub URL and a free-form `settings` JSON. That is the whole profile. There is no work authorization, visa, salary, notice period, target roles, structured experience or education at profile level (those live only inside individual resumes), no provenance, no versioning. The frontend additionally writes a parallel user document to **Firestore** (`dashboard.tsx`, `login.tsx`), a second source of truth outside the backend.
+
+**Classification: KEEP `User` as the account record. ADD `CandidateProfile` as a new aggregate. DEPRECATE the Firestore writes.**
+
+## 11. Application functionality
+
+`POST /api/jobs/apply` records a manual application; `PATCH …/status` moves it through `APPLIED → INTERVIEWING → OFFER / REJECTED / WITHDRAWN`, ownership-checked against the (spoofable) `userId`. Duplicate applications are blocked. The UI click-outs to the job URL.
+
+Gaps: no transition history, no notes, no interview or offer records, no link to the documents used; the email-verification gate fails closed on any user-service hiccup. `ApplicationHistory` (a rich, unused entity) contains `captchaSolved` and `browserAutomationUsed` fields from the removed auto-apply design.
+
+**Classification: EXTEND** `JobApplication` with the full lifecycle and a transition log. **DEPRECATE** `ApplicationHistory`.
+
+## 12. Browser automation
+
+**None exists.** `auto_apply_agent.py`, `advanced_auto_apply.py`, `robust_auto_apply.py`, `real-automation.tsx`, the `/browser-automation` endpoint and the AI auto-apply endpoints were deleted in the uncommitted working tree. Playwright is not installed.
+
+Residue still present: nine gateway routes to deleted endpoints; `ANTICAPTCHA_API_KEY`, `CAPTCHA_API_KEY`, `AUTO_APPLY_*`, `PLAYWRIGHT_*` in `.env`; `AUTO_APPLY_ENABLED`, `HEADLESS_BROWSER` in compose; `setup_advanced_features.py` (45 references); `Schedule.autoApplyEnabled`; `autoApplyEnabled: false` sent by `api.ts`.
+
+**Classification: DEPRECATE the residue**, especially the CAPTCHA-solver keys, which have no legitimate use under this project's rules. Any future `BrowserAutomationService` starts clean (Phase 6).
+
+## 13. Authentication
+
+Intended design: Firebase Auth in the browser (Google, GitHub), ID token posted once to `/api/auth/verify`, user row created or fetched.
+
+What the code does:
+
+- `FirebaseAuthService.getOrCreateUserFromToken` verifies with Firebase Admin, and **on any verification failure falls back to `getOrCreateFromLocalJwt`**, which base64-decodes the token payload and trusts it **without checking a signature**. This fallback also runs when Firebase is fully configured. Anyone can mint a token for any `uid`/`email` with `email_verified: true`.
+- After that one call, nothing is authenticated. The gateway comment says JWT enforcement "will be added once the frontend propagates Authorization headers"; it never was.
+- Admin authorization is an `X-User-Id` header containing a Firebase UID. `GET /api/users/{id}` returns the full `User` including `firebaseUid`, so any caller can read an admin's UID and then call `PUT /api/users/{id}/role`.
+- LinkedIn OAuth in the gateway generates a `state` and never validates it, takes `userId` from the query string, requests scopes LinkedIn has retired (`r_liteprofile`, `r_emailaddress`), and on success **overwrites the user's name and email** with LinkedIn's values.
+
+**Classification: REPLACE** the enforcement model. **KEEP** Firebase as identity provider.
+
+## 14. Tests
+
+| Area | Tests | Result |
+|---|---|---|
+| Java (6 services) | 0 (`job-service/src/test/java` is an empty directory) | — |
+| Python | 0 | — |
+| Frontend | 1 file, `LocationSearch.test.tsx` | **Fails to parse**: no jest config, no TS/JSX transform, no jsdom |
+| CI | Compiles Java with `-DskipTests`, lints Python, builds frontend, validates compose | Runs no tests |
+
+**Classification: ADD.** A test harness per stack is a Phase 1 prerequisite.
+
+## 15. Technical debt
+
+1. AI service code untracked (above).
+2. 25 files of uncommitted work on `main`; ~35 MB of build logs in the repo root.
+3. No migrations; SQL scripts and entities disagree.
+4. Dead code: four AI modules, three entities, `RateLimitingConfig`/`RateLimitInterceptor`, hand-written Swagger controllers, unused `aiAPI`/`userAPI` helpers, three alternate Dockerfiles.
+5. Frontend calls with relative URLs (`fetch('/api/job-aggregator/search')`) that only resolve behind the nginx proxy, mixed with absolute `API_BASE_URL` calls; calls to endpoints that do not exist (`/api/demo/*`, `/api/errors/report`, `/api/resumes/analyze-skills`, `/api/stats`, `/api/auth/user`).
+6. Stale docs: nine Markdown files describing auto-apply, Kafka streaming and vector memory that are not running.
+7. Spring Boot 2.7 / Java `javax.*` stack is end of life.
+8. `.env.example` omits Groq, Gemini and Adzuna and sets `KAFKA_ENABLED=true`.
+
+## 16. Security risks
+
+| # | Severity | Risk | Location |
+|---|---|---|---|
+| S1 | Critical | No authentication or authorization on any endpoint; full IDOR via `userId` | gateway `SecurityConfig`, all controllers |
+| S2 | Critical | Unsigned-JWT login fallback, active even with Firebase configured | `FirebaseAuthService` |
+| S3 | Critical | Account takeover and deletion: `DELETE /api/users/me?userId=N`, `PUT /api/profile?userId=N` | `UserController`, `ProfileController` |
+| S4 | Critical | Privilege escalation through spoofable `X-User-Id` plus leaked `firebaseUid` | `UserController` |
+| S5 | High | Every service, Postgres (default password) and unauthenticated Redis published on host ports, bypassing the gateway | `docker-compose.yml` |
+| S6 | High | AI service: no auth, `allow_origins=["*"]` with credentials, exposed on :8000 | `main.py` |
+| S7 | High | Prompt injection: resume text, job descriptions and chat input are interpolated straight into LLM task prompts | `crew_ai_service.py` |
+| S8 | High | LinkedIn OAuth CSRF (unvalidated `state`) and silent profile overwrite | gateway `AuthController` |
+| S9 | Medium | Rate limiting and IP reputation keyed on client-supplied `X-Forwarded-For` | `RateLimitingFilter`, `ThreatDetectionFilter` |
+| S10 | Medium | Unauthenticated `POST /api/users/audit-log` lets anyone forge audit entries | `UserController` |
+| S11 | Medium | `InputValidationFilter` blocks any URL or header containing `select `, `update `, `delete `… (false positives on legitimate searches) while giving no real SQL-injection protection (JPA already parameterizes) | gateway |
+| S12 | Medium | Live secrets for OpenAI, Groq, Gemini, SendGrid, SMTP and two CAPTCHA solvers sit in `.env` (ignored, never committed — good) with no rotation or separation | `.env` |
+| S13 | Low | Errors return raw exception messages; actuator `show-details=always`; Swagger on by default; `System.out` audit fallback | services |
+| S14 | Low | Soft-deleted resumes survive account deletion | `ResumeServiceImpl` |
+
+The Firebase web API key in `firebase.ts` is public by design and is not a finding on its own; it becomes one only because Firestore is in use and its security rules were not available to review.
+
+## 17. Scalability problems
+
+1. Schedules live in an in-process dict inside the AI container: lost on restart, wrong with more than one replica.
+2. `job_matches` gains 20 rows per `GET /api/jobs/matches`, unbounded, never deduplicated.
+3. Resume upload holds a DB transaction across two LLM calls (up to 90 s).
+4. `GET /api/users` returns every user unpaginated.
+5. Admin and analytics dashboards fan out blocking `RestTemplate` calls from the reactive gateway.
+6. AI service notification history, WebSocket registry and rate limits are in memory.
+7. No job corpus: every search is a fresh external call, so there is nothing to deduplicate, rank or learn from across searches.
+8. Matching loads data into the application; no indexes on JSONB skill columns.
+
+## 18. Reusable components
+
+| Component | Reuse as |
+|---|---|
+| `FileProcessor` (PDFBox/POI) | ResumeAgent `parse` |
+| `heuristic_resume_analysis`, `_heuristic_extract_skills` | Rules tier of resume parsing and matching |
+| `select_llm` provider chain | Seed of `LLMProvider` |
+| Adzuna adapter + Redis cache-aside | First `JobSourceAdapter` |
+| `_compute_match_score`, `_find_matching_keywords` | Keyword tier of the hybrid matcher |
+| `ExportServiceImpl` | Tailored-resume rendering |
+| `JobApplication` + status PATCH + history UI | Application lifecycle base |
+| `SavedJob` | `SHORTLISTED` state |
+| `AccountService` export/delete | Data-subject rights for the new entities |
+| `ThreatDetectionFilter` Redis state | Keep |
+| shadcn UI kit, `job-match-card`, `resume-upload`, `resume-metadata`, `application-history` | New pages |
+| `isSampleData` convention | Becomes the provenance convention |
+
+## 19. Broken components
+
+| # | Component | Failure |
+|---|---|---|
+| B1 | `POST /api/scheduler/setup`, `GET /api/scheduler/{id}/status`, `POST /api/scheduler/{id}/run`, `DELETE /api/scheduler/{id}`, `POST /api/schedule-interview` | Call `SchedulerAgent` methods that do not exist → 500. `/api/jobs/automation/start` depends on the first. |
+| B2 | "Run now" (`/api/automation/run-advanced/{id}`, `/api/schedules/{id}/run`) | Calls `/api/schedule/{id}/run`, which the AI service does not define → 404 |
+| B3 | `SchedulerAgent._process_schedule_config` | `Task` without `expected_output` and sync `kickoff()` in a running loop: always throws, silently falls back. Missed by the August CrewAI fix. |
+| B4 | Schedule run statistics | Looks up a schedule ID built from a `created_timestamp` that is never set; counters never move |
+| B5 | Schedule creation without an LLM | `SchedulerAgent.initialize` raises if no provider → creation fails |
+| B6 | `ScheduleController.createSchedule` | Discards the user's keywords; hardcodes `["software","developer"]` |
+| B7 | `ScheduleController.toggleSchedule` | Always pauses, never resumes |
+| B8 | Scraped job identity | Positional IDs overwrite each other (§8) |
+| B9 | `/api/enhanced-job-matches` | 503 in Docker (missing deps) |
+| B10 | `profile.tsx:384` | Sends Firebase UID to an endpoint expecting a numeric ID → 400 |
+| B11 | `CoverLetterGenerator` wrapper | Passes arguments in the wrong positions (unused on the live path) |
+| B12 | Frontend test | Cannot be parsed |
+| B13 | Gateway rate limiter | `RequestRateLimiter` never wired (documented in `RateLimitConfig`) |
+| B14 | Nine gateway routes | Point at deleted AI endpoints |
+
+## 20. Missing components
+
+Against the target vision, nothing below exists today: CandidateProfile with provenance; ProfileVersion and rollback; master-profile.yaml; ResumeVersion; role-specific resume generation; `JobSourceAdapter`; NormalizedJob; job corpus; cross-source deduplication; job safety scoring; embeddings; explainable multi-factor match; ATS detection; application packages; AnswerPolicy; ApplicationDecisionAgent; lifecycle transition log; Interview and Offer records; Approval queue and UI; platform profile drafts (LinkedIn, Naukri, Cutshort, Instahyre); PlatformPolicy and automation modes; DRY_RUN; global and per-platform kill switch; orchestrator with per-agent permissions; prompt-injection isolation; `LLMProvider` with structured output; credential vault; structured audit log (`before`/`after`/`runId`); outcome analytics; any automated tests.
+
+---
+
+## Subsystem classification summary
+
+| Subsystem | Verdict | Reason |
+|---|---|---|
+| Microservice boundaries, Eureka, gateway routing | KEEP | Sound |
+| Postgres per-service databases, Redis | KEEP | Sound |
+| Schema management (`ddl-auto` + SQL scripts) | REPLACE | Scripts and entities disagree; no history |
+| Gateway security model | REPLACE | Enforces nothing |
+| Firebase as identity provider | KEEP | Works |
+| Unsigned-JWT fallback | DEPRECATE (dev-profile only, off by default) | Auth bypass |
+| `User` entity and profile endpoints | KEEP + EXTEND | Account record; add CandidateProfile beside it |
+| Firestore user document | DEPRECATE | Second source of truth |
+| Resume upload, parse, export | EXTEND | Works; add versions, storage, provenance |
+| CrewAI wrapper | REFACTOR | Free-text output, per-request re-init, no injection defence |
+| LLM provider chain | EXTEND | Add Anthropic, OpenRouter, structured output |
+| Heuristic fallbacks | KEEP | Honest and useful as the cheap tier |
+| Adzuna adapter, Redis cache | KEEP + EXTEND | Licensed source; add attribution |
+| HTML scrapers | DEPRECATE | Terms violations, unstable IDs, unreliable |
+| Keyword match score | EXTEND | Becomes one tier of four |
+| Job persistence (`Job`, `JobMatch`) | REFACTOR | Needs stable identity, fingerprint, bounded match rows |
+| Application tracking | EXTEND | Good base |
+| Schedules | REPLACE | In-memory, half the endpoints broken; move to job-service DB |
+| Notifications (AI in-memory + Spring stateless) | REFACTOR | Two half-services; persist in notification-service |
+| Admin and analytics | KEEP | Live queries; secure them |
+| Frontend shell and UI kit | KEEP + EXTEND | Reusable |
+| Market intelligence, career mentor pages | KEEP as labeled | Heuristic, honest |
+| Dead AI modules, unused entities, hand-written Swagger, auto-apply residue | DEPRECATE | Unreferenced or obsolete |
+| Tests, CI test stage | ADD | None exist |

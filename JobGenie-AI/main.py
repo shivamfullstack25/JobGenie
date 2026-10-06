@@ -108,13 +108,6 @@ crew_ai_service = _safe_import(
 )
 
 # Optional / heavy services — degrade gracefully if deps missing
-auto_apply_agent = _safe_import(
-    "auto_apply", lambda: __import__("app.services.auto_apply_agent", fromlist=["AutoApplyAgent"]).AutoApplyAgent()
-)
-advanced_auto_apply_agent = _safe_import(
-    "advanced_auto_apply",
-    lambda: __import__("app.services.advanced_auto_apply", fromlist=["AdvancedAutoApplyAgent"]).AdvancedAutoApplyAgent(),
-)
 scheduler_agent = _safe_import(
     "scheduler", lambda: __import__("app.services.scheduler_agent", fromlist=["SchedulerAgent"]).SchedulerAgent()
 )
@@ -170,12 +163,6 @@ class CareerAdviceRequest(BaseModel):
     career_goals: str
     skills: List[str]
 
-class AutoApplyRequest(BaseModel):
-    job_id: str
-    resume_content: str
-    cover_letter: str
-    platform: str
-
 class SchedulingRequest(BaseModel):
     user_id: str
     interview_type: str
@@ -209,13 +196,6 @@ class SchedulerSetupRequest(BaseModel):
 class SchedulerStatusRequest(BaseModel):
     scheduler_id: str
 
-class AdvancedAutoApplyRequest(BaseModel):
-    job_url: str
-    platform: str
-    user_credentials: Dict[str, str]
-    resume_path: str
-    cover_letter: Optional[str] = ""
-
 class ScheduleConfigRequest(BaseModel):
     user_id: str
     frequency: str  # daily, weekly, hourly
@@ -225,16 +205,6 @@ class ScheduleConfigRequest(BaseModel):
     platforms: Optional[List[str]] = ["linkedin", "indeed", "naukri"]
     max_jobs_per_search: Optional[int] = 50
     filters: Optional[Dict[str, Any]] = {}
-
-class AutoApplyScheduleRequest(BaseModel):
-    user_id: str
-    frequency: str  # daily, twice_daily, weekly
-    apply_time: Optional[str] = "10:00"
-    max_applications_per_run: Optional[int] = 5
-    min_match_score: Optional[int] = 70
-    platforms: Optional[List[str]] = ["linkedin", "indeed"]
-    auto_apply_enabled: Optional[bool] = True
-    require_cover_letter: Optional[bool] = True
 
 class NotificationRequest(BaseModel):
     user_id: str
@@ -518,20 +488,14 @@ async def get_job_matches(request: JobSearchRequest):
             max_jobs=request.max_jobs
         )
         
-        # Analyze matches using AI
-        matches = []
-        for job in jobs:
-            # Extract skills from job description
-            job_skills = extract_skills_from_description(job.get('description', ''))
-            
-            # Calculate match score (simplified for demo)
-            match_score = calculate_match_score(request.keywords, job_skills)
-            
-            job['match_score'] = match_score
-            job['skills_required'] = job_skills
-            matches.append(job)
-        
-        # Sort by match score
+        # job_aggregator.search_jobs() already computed a real keyword-overlap
+        # match_score, skills_required (the query terms that actually matched), and
+        # match_reasons for every job — this used to immediately overwrite all three
+        # with a cruder pass (a fixed 9-word skill list checked only against
+        # `description`, which is frequently empty for scraped jobs) that produced
+        # worse results than what job_aggregator had already computed. Removed —
+        # just pass the jobs through and sort by the score they already carry.
+        matches = list(jobs)
         matches.sort(key=lambda x: x.get('match_score', 0), reverse=True)
         
         return {
@@ -1331,23 +1295,6 @@ async def get_career_advice(request: CareerAdviceRequest):
         logger.error(f"Error getting career advice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auto-apply")
-async def auto_apply_job(request: AutoApplyRequest):
-    """Automatically apply to a job"""
-    try:
-        result = await _require(auto_apply_agent, "auto_apply").apply_to_job(
-            job_id=request.job_id,
-            resume_content=request.resume_content,
-            cover_letter=request.cover_letter,
-            platform=request.platform
-        )
-        
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error auto-applying to job: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/schedule-interview")
 async def schedule_interview(request: SchedulingRequest):
     """Schedule interview using AI agent"""
@@ -1435,24 +1382,6 @@ async def get_available_platforms():
         ]
     }
 
-@app.post("/api/advanced-auto-apply")
-async def advanced_auto_apply_job(request: AdvancedAutoApplyRequest):
-    """Apply to a job using advanced browser automation"""
-    try:
-        result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-            job_url=request.job_url,
-            platform=request.platform,
-            user_credentials=request.user_credentials,
-            resume_path=request.resume_path,
-            cover_letter=request.cover_letter
-        )
-        
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error in advanced auto-apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/schedule/job-search")
 async def create_job_search_schedule(request: ScheduleConfigRequest):
     """Create a new job search schedule"""
@@ -1466,21 +1395,6 @@ async def create_job_search_schedule(request: ScheduleConfigRequest):
         
     except Exception as e:
         logger.error(f"Error creating job search schedule: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/schedule/auto-apply")
-async def create_auto_apply_schedule(request: AutoApplyScheduleRequest):
-    """Create a new auto-apply schedule"""
-    try:
-        schedule_result = await _require(scheduler_agent, "scheduler").create_auto_apply_schedule(
-            user_id=request.user_id,
-            schedule_config=request.dict()
-        )
-        
-        return JSONResponse(content=schedule_result)
-        
-    except Exception as e:
-        logger.error(f"Error creating auto-apply schedule: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/schedule/user/{user_id}")
@@ -1660,200 +1574,6 @@ async def websocket_notifications(websocket: WebSocket, user_id: str):
     finally:
         # Unregister WebSocket connection
         await _require(notification_service, "notification").unregister_websocket_connection(user_id)
-
-# Enhanced Job Search with Auto-Apply
-@app.post("/api/jobs/search-and-apply")
-async def search_and_apply_jobs(request: JobSearchRequest):
-    """Search for jobs and automatically apply to matching ones"""
-    try:
-        # Search for jobs
-        jobs = await job_aggregator.search_jobs(
-            keywords=request.keywords,
-            location=request.location,
-            platforms=request.platforms or ['linkedin', 'indeed', 'naukri'],
-            max_jobs=request.max_jobs
-        )
-        
-        # Filter jobs for auto-apply (high match score)
-        auto_apply_jobs = [job for job in jobs if job.get('match_score', 0) >= 80]
-        
-        # Apply to top matching jobs (limit to 5 per request)
-        applications_submitted = []
-        for job in auto_apply_jobs[:5]:
-            try:
-                # This would use user's stored credentials and resume
-                application_result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-                    job_url=job.get('url'),
-                    platform=job.get('platform'),
-                    user_credentials={},  # Would fetch from user profile
-                    resume_path="",  # Would fetch user's active resume
-                    cover_letter=""  # Would generate based on job
-                )
-                
-                if application_result.get('success'):
-                    applications_submitted.append({
-                        'job': job,
-                        'application_result': application_result
-                    })
-                    
-            except Exception as e:
-                logger.error(f"Error auto-applying to job {job.get('id')}: {e}")
-                continue
-        
-        return JSONResponse(content={
-            "jobs_found": len(jobs),
-            "auto_apply_candidates": len(auto_apply_jobs),
-            "applications_submitted": len(applications_submitted),
-            "jobs": jobs,
-            "applications": applications_submitted
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in search and apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Platform-specific Auto-Apply Endpoints
-@app.post("/api/auto-apply/linkedin")
-async def auto_apply_linkedin(request: AdvancedAutoApplyRequest):
-    """Auto-apply specifically for LinkedIn jobs with optimized flow"""
-    try:
-        # Use LinkedIn-specific optimizations
-        request.platform = "linkedin"
-        
-        result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-            job_url=request.job_url,
-            platform=request.platform,
-            user_credentials=request.user_credentials,
-            resume_path=request.resume_path,
-            cover_letter=request.cover_letter
-        )
-        
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error in LinkedIn auto-apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/auto-apply/indeed")
-async def auto_apply_indeed(request: AdvancedAutoApplyRequest):
-    """Auto-apply specifically for Indeed jobs with optimized flow"""
-    try:
-        request.platform = "indeed"
-        
-        result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-            job_url=request.job_url,
-            platform=request.platform,
-            user_credentials=request.user_credentials,
-            resume_path=request.resume_path,
-            cover_letter=request.cover_letter
-        )
-        
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error in Indeed auto-apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/auto-apply/naukri")
-async def auto_apply_naukri(request: AdvancedAutoApplyRequest):
-    """Auto-apply specifically for Naukri jobs with optimized flow"""
-    try:
-        request.platform = "naukri"
-        
-        result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-            job_url=request.job_url,
-            platform=request.platform,
-            user_credentials=request.user_credentials,
-            resume_path=request.resume_path,
-            cover_letter=request.cover_letter
-        )
-        
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error in Naukri auto-apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Batch Auto-Apply Endpoint
-@app.post("/api/auto-apply/batch")
-async def batch_auto_apply(request: Dict[str, Any]):
-    """Apply to multiple jobs in batch with intelligent scheduling"""
-    try:
-        jobs = request.get('jobs', [])
-        user_credentials = request.get('user_credentials', {})
-        resume_path = request.get('resume_path', '')
-        max_applications = request.get('max_applications', 10)
-        delay_between_applications = request.get('delay_between_applications', 60)  # seconds
-        
-        results = []
-        successful_applications = 0
-        failed_applications = 0
-        
-        for i, job in enumerate(jobs[:max_applications]):
-            try:
-                # Generate job-specific cover letter
-                cover_letter = await cover_letter_generator.generate_cover_letter(
-                    job_description=job.get('description', ''),
-                    company_name=job.get('company', ''),
-                    job_title=job.get('title', ''),
-                    user_profile={},  # Would fetch from user service
-                    resume_content=''  # Would read from resume_path
-                )
-                
-                # Apply to the job
-                application_result = await _require(advanced_auto_apply_agent, "advanced_auto_apply").apply_to_job(
-                    job_url=job.get('url'),
-                    platform=job.get('platform'),
-                    user_credentials=user_credentials,
-                    resume_path=resume_path,
-                    cover_letter=cover_letter.get('cover_letter', '')
-                )
-                
-                if application_result.get('success'):
-                    successful_applications += 1
-                else:
-                    failed_applications += 1
-                
-                results.append({
-                    'job': job,
-                    'result': application_result,
-                    'order': i + 1
-                })
-                
-                # Add delay between applications to avoid detection
-                if i < len(jobs) - 1:  # Don't delay after the last job
-                    await asyncio.sleep(delay_between_applications)
-                
-            except Exception as e:
-                logger.error(f"Error applying to job {job.get('id')}: {e}")
-                failed_applications += 1
-                results.append({
-                    'job': job,
-                    'result': {'success': False, 'error': str(e)},
-                    'order': i + 1
-                })
-        
-        # Send summary notification
-        if request.get('user_id'):
-            await _require(notification_service, "notification").send_auto_apply_notification(
-                user_id=request['user_id'],
-                applications_submitted=successful_applications,
-                successful_applications=[r for r in results if r['result'].get('success')],
-                failed_applications=[r for r in results if not r['result'].get('success')],
-                total_jobs_considered=len(jobs)
-            )
-        
-        return JSONResponse(content={
-            "total_jobs": len(jobs),
-            "applications_attempted": len(results),
-            "successful_applications": successful_applications,
-            "failed_applications": failed_applications,
-            "results": results
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in batch auto-apply: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Helper functions
 def extract_skills_from_description(description: str) -> List[str]:

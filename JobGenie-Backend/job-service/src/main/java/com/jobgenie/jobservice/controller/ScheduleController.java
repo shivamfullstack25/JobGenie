@@ -68,15 +68,11 @@ public class ScheduleController {
       // Transform frontend request to AI service format
       Map<String, Object> aiRequest = transformToAIScheduleRequest(scheduleRequest);
 
-      // Determine endpoint based on schedule type
-      String endpoint = "/api/schedule/job-search";
-      if (Boolean.TRUE.equals(scheduleRequest.get("autoApplyEnabled"))) {
-        endpoint = "/api/schedule/auto-apply";
-      }
-
-      // Call AI service
+      // Search-only: the auto-apply schedule variant was removed (see CLAUDE.md
+      // "Product decisions (locked)" — JobGenie doesn't apply on the user's behalf).
       Map<String, Object> response =
-          restTemplate.postForObject(aiServiceUrl + endpoint, aiRequest, Map.class);
+          restTemplate.postForObject(
+              aiServiceUrl + "/api/schedule/job-search", aiRequest, Map.class);
 
       // Transform response to frontend format
       Map<String, Object> result = new HashMap<>();
@@ -202,54 +198,30 @@ public class ScheduleController {
   }
 
   @PostMapping("/{scheduleId}/run")
-  @Operation(summary = "Run schedule", description = "Execute a schedule immediately")
+  @Operation(summary = "Run schedule", description = "Execute a job-search schedule immediately")
   public ResponseEntity<Map<String, Object>> runSchedule(@PathVariable String scheduleId) {
     try {
-      log.info("Running schedule: {}", scheduleId);
-
-      // Call batch auto-apply as immediate execution
-      Map<String, Object> batchRequest =
-          Map.of(
-              "max_applications",
-              10,
-              "delay_between_applications",
-              60,
-              "user_credentials",
-              Map.of(),
-              "resume_path",
-              "");
+      log.info("Running job-search schedule now: {}", scheduleId);
 
       Map<String, Object> response =
           restTemplate.postForObject(
-              aiServiceUrl + "/api/auto-apply/batch", batchRequest, Map.class);
+              aiServiceUrl + "/api/schedule/" + scheduleId + "/run", Map.of(), Map.class);
 
-      // Transform response
       Map<String, Object> result = new HashMap<>();
       if (response != null) {
-        result.put("jobsFound", response.getOrDefault("total_jobs", 0));
-        result.put("applicationsSubmitted", response.getOrDefault("successful_applications", 0));
+        result.put("jobsFound", response.getOrDefault("jobs_found", 0));
         result.put("success", true);
       } else {
         result.put("jobsFound", 0);
-        result.put("applicationsSubmitted", 0);
         result.put("success", false);
       }
 
       return ResponseEntity.ok(result);
 
     } catch (Exception e) {
-      log.error("Error running schedule: {}", e.getMessage(), e);
+      log.error("Error running job-search schedule: {}", e.getMessage(), e);
       return ResponseEntity.status(500)
-          .body(
-              Map.of(
-                  "success",
-                  false,
-                  "error",
-                  e.getMessage(),
-                  "jobsFound",
-                  0,
-                  "applicationsSubmitted",
-                  0));
+          .body(Map.of("success", false, "error", e.getMessage(), "jobsFound", 0));
     }
   }
 

@@ -89,7 +89,7 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     onSuccess: (data: any) => {
       toast({
         title: "Job Search Complete",
-        description: `Found ${data.jobsFound} jobs, applied to ${data.applicationsSubmitted} positions.`,
+        description: `Found ${data.jobsFound} jobs — review and apply from your matches.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/job-applications"] });
@@ -425,7 +425,7 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
                 ))}
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                Select platforms where you want to automatically apply for jobs
+                Select platforms to search for jobs on — JobGenie finds matches, you apply yourself on each site
               </p>
             </div>
 

@@ -1,6 +1,7 @@
 package com.jobgenie.resumeservice.client;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -60,11 +61,13 @@ public class AIServiceClient {
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
 
-      Map<String, Object> request =
-          Map.of(
-              "resume_content", resumeContent,
-              "job_description", jobDescription != null ? jobDescription : "",
-              "target_score", targetScore != null ? targetScore : 80);
+      // Map.of() throws NullPointerException on any null value (not just missing keys) —
+      // build with a mutable map instead so a null resumeContent surfaces as a normal
+      // downstream error rather than a bare NPE.
+      Map<String, Object> request = new HashMap<>();
+      request.put("resume_content", resumeContent != null ? resumeContent : "");
+      request.put("job_description", jobDescription != null ? jobDescription : "");
+      request.put("target_score", targetScore != null ? targetScore : 80);
 
       HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 

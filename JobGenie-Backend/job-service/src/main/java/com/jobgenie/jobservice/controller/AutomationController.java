@@ -29,85 +29,59 @@ public class AutomationController {
 
   @PostMapping("/schedule-advanced")
   @Operation(
-      summary = "Create advanced automation schedule",
-      description = "Set up automated job search and application schedule")
+      summary = "Create a job-search schedule",
+      description =
+          "Set up a recurring job search (search only — see CLAUDE.md 'Product decisions"
+              + " (locked)': JobGenie doesn't auto-apply on the user's behalf).")
   public ResponseEntity<Map<String, Object>> createAdvancedSchedule(
       @RequestBody Map<String, Object> scheduleRequest) {
     try {
-      log.info("Creating advanced automation schedule for user: {}", scheduleRequest.get("userId"));
+      log.info("Creating job-search schedule for user: {}", scheduleRequest.get("userId"));
 
       // Transform frontend request to AI service format
       Map<String, Object> aiRequest = transformToAIScheduleRequest(scheduleRequest);
 
-      // Call AI service scheduling endpoint
-      String endpoint = "/api/schedule/job-search";
-      if (Boolean.TRUE.equals(scheduleRequest.get("autoApplyEnabled"))) {
-        endpoint = "/api/schedule/auto-apply";
-      }
-
+      // Search-only: the auto-apply schedule variant was removed (see CLAUDE.md).
       Map<String, Object> response =
-          restTemplate.postForObject(aiServiceUrl + endpoint, aiRequest, Map.class);
+          restTemplate.postForObject(
+              aiServiceUrl + "/api/schedule/job-search", aiRequest, Map.class);
 
       return ResponseEntity.ok(response != null ? response : Map.of("success", true));
 
     } catch (Exception e) {
-      log.error("Error creating advanced schedule: {}", e.getMessage(), e);
+      log.error("Error creating job-search schedule: {}", e.getMessage(), e);
       return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
     }
   }
 
   @PostMapping("/run-advanced/{scheduleId}")
   @Operation(
-      summary = "Run advanced automation",
-      description = "Execute automated job search and application process")
+      summary = "Run a job-search schedule now",
+      description = "Execute a scheduled job search immediately and return the results found.")
   public ResponseEntity<Map<String, Object>> runAdvancedAutomation(
       @PathVariable String scheduleId) {
     try {
-      log.info("Running advanced automation for schedule: {}", scheduleId);
-
-      // For immediate execution, call the batch auto-apply endpoint
-      Map<String, Object> batchRequest =
-          Map.of(
-              "max_applications",
-              10,
-              "delay_between_applications",
-              60,
-              "user_credentials",
-              Map.of(),
-              "resume_path",
-              "");
+      log.info("Running job-search schedule now: {}", scheduleId);
 
       Map<String, Object> response =
           restTemplate.postForObject(
-              aiServiceUrl + "/api/auto-apply/batch", batchRequest, Map.class);
+              aiServiceUrl + "/api/schedule/" + scheduleId + "/run", Map.of(), Map.class);
 
-      // Transform response to expected format
       Map<String, Object> result = new HashMap<>();
       if (response != null) {
-        result.put("jobsFound", response.getOrDefault("total_jobs", 0));
-        result.put("applicationsSubmitted", response.getOrDefault("successful_applications", 0));
+        result.put("jobsFound", response.getOrDefault("jobs_found", 0));
         result.put("success", true);
       } else {
         result.put("jobsFound", 0);
-        result.put("applicationsSubmitted", 0);
         result.put("success", false);
       }
 
       return ResponseEntity.ok(result);
 
     } catch (Exception e) {
-      log.error("Error running advanced automation: {}", e.getMessage(), e);
+      log.error("Error running job-search schedule: {}", e.getMessage(), e);
       return ResponseEntity.status(500)
-          .body(
-              Map.of(
-                  "success",
-                  false,
-                  "error",
-                  e.getMessage(),
-                  "jobsFound",
-                  0,
-                  "applicationsSubmitted",
-                  0));
+          .body(Map.of("success", false, "error", e.getMessage(), "jobsFound", 0));
     }
   }
 
@@ -244,11 +218,7 @@ public class AutomationController {
     try {
       log.info("Creating automation schedule for user: {}", scheduleRequest.get("userId"));
 
-      // Transform to advanced schedule format
-      Map<String, Object> advancedRequest = new HashMap<>(scheduleRequest);
-      advancedRequest.put("autoApplyEnabled", false); // Basic schedule without auto-apply
-
-      return createAdvancedSchedule(advancedRequest);
+      return createAdvancedSchedule(scheduleRequest);
 
     } catch (Exception e) {
       log.error("Error creating schedule: {}", e.getMessage(), e);
@@ -256,78 +226,12 @@ public class AutomationController {
     }
   }
 
-  @PostMapping("/browser-automation")
-  @Operation(
-      summary = "Run browser automation",
-      description = "Execute browser-based job application automation")
-  public ResponseEntity<Map<String, Object>> runBrowserAutomation(
-      @RequestBody Map<String, Object> automationRequest) {
-    try {
-      // Never log the raw request — it carries plaintext job-site credentials.
-      log.info("Running browser automation for platforms: {}", automationRequest.get("platforms"));
-
-      // Extract platforms and credentials
-      @SuppressWarnings("unchecked")
-      List<String> platforms =
-          (List<String>) automationRequest.getOrDefault("platforms", List.of());
-
-      Map<String, Object> response = new HashMap<>();
-      int totalApplications = 0;
-      int successfulApplications = 0;
-
-      // Process each platform
-      for (String platform : platforms) {
-        try {
-          Map<String, Object> platformRequest =
-              Map.of(
-                  "job_url",
-                  "https://" + platform + ".com/jobs",
-                  "platform",
-                  platform,
-                  "user_credentials",
-                  automationRequest.getOrDefault("credentials", Map.of()),
-                  "resume_path",
-                  automationRequest.getOrDefault("resumePath", ""),
-                  "cover_letter",
-                  "");
-
-          Map<String, Object> platformResponse =
-              restTemplate.postForObject(
-                  aiServiceUrl + "/api/auto-apply/" + platform, platformRequest, Map.class);
-
-          if (platformResponse != null && Boolean.TRUE.equals(platformResponse.get("success"))) {
-            successfulApplications++;
-          }
-          totalApplications++;
-
-        } catch (Exception e) {
-          log.error("Error with platform {}: {}", platform, e.getMessage());
-          totalApplications++;
-        }
-      }
-
-      response.put("totalApplications", totalApplications);
-      response.put("successfulApplications", successfulApplications);
-      response.put("success", true);
-      response.put("results", List.of());
-
-      return ResponseEntity.ok(response);
-
-    } catch (Exception e) {
-      log.error("Error running browser automation: {}", e.getMessage(), e);
-      return ResponseEntity.status(500)
-          .body(
-              Map.of(
-                  "success",
-                  false,
-                  "error",
-                  e.getMessage(),
-                  "totalApplications",
-                  0,
-                  "successfulApplications",
-                  0));
-    }
-  }
+  // Credential-based browser automation (runBrowserAutomation, POST /browser-automation) was
+  // removed per CLAUDE.md "Product decisions (locked)": JobGenie is a metasearch/click-out
+  // product, not a bot that logs into job sites with the user's passwords. It forwarded
+  // plaintext third-party credentials to the AI service's now-removed /api/auto-apply/{platform}
+  // endpoints — a real security liability with no legitimate replacement here; the product
+  // surface is click-out apply + manual "mark applied" logging instead (see JobController).
 
   private Map<String, Object> transformToAIScheduleRequest(Map<String, Object> frontendRequest) {
     Map<String, Object> aiRequest = new HashMap<>();

@@ -178,14 +178,6 @@ export const aiAPI = {
     return response.json();
   },
 
-  autoApplyToJob: async (jobId: string, userId: string, resumeId: string, coverLetterId?: string) => {
-    // JobController.applyToJob binds jobId/userId/resumeId/coverLetterId as @RequestParam, not a
-    // JSON @RequestBody — a JSON POST here was always rejected (missing required parameters).
-    // jobAPI.applyToJob already sends the correct form-encoded request; reuse it instead of
-    // duplicating (and re-breaking) the same call.
-    return jobAPI.applyToJob(jobId, userId, resumeId, coverLetterId);
-  },
-
   getUserApplications: async (userId: string, page: number = 1, size: number = 10) => {
     const response = await fetch(`${API_BASE_URL}/api/jobs/applications?userId=${userId}&page=${page}&size=${size}`);
     return response.json();
@@ -221,78 +213,9 @@ export const aiAPI = {
     return response.json();
   },
 
-  // Advanced Auto-Apply Endpoints
-  advancedAutoApply: async (jobUrl: string, platform: string, userCredentials: any, resumePath: string, coverLetter: string = '') => {
-    const response = await fetch(`${API_BASE_URL}/api/advanced-auto-apply`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        job_url: jobUrl,
-        platform: platform,
-        user_credentials: userCredentials,
-        resume_path: resumePath,
-        cover_letter: coverLetter,
-      }),
-    });
-
-    return response.json();
-  },
-
-  batchAutoApply: async (jobs: any[], userCredentials: any, resumePath: string, maxApplications: number = 10) => {
-    const response = await fetch(`${API_BASE_URL}/api/auto-apply/batch`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jobs: jobs,
-        user_credentials: userCredentials,
-        resume_path: resumePath,
-        max_applications: maxApplications,
-        delay_between_applications: 60,
-      }),
-    });
-
-    return response.json();
-  },
-
-  searchAndApply: async (keywords: string[], location: string, platforms: string[] = ['linkedin', 'indeed']) => {
-    const response = await fetch(`${API_BASE_URL}/api/jobs/search-and-apply`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        keywords: keywords,
-        location: location,
-        platforms: platforms,
-        max_jobs: 50,
-      }),
-    });
-
-    return response.json();
-  },
-
   // Schedule Management
   createJobSearchSchedule: async (userId: string, scheduleConfig: any) => {
     const response = await fetch(`${API_BASE_URL}/api/schedule/job-search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        ...scheduleConfig,
-      }),
-    });
-
-    return response.json();
-  },
-
-  createAutoApplySchedule: async (userId: string, scheduleConfig: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedule/auto-apply`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -413,11 +336,14 @@ export const jobAPI = {
     return response.json();
   },
 
-  applyToJob: async (jobId: string, userId: string, resumeId: string, coverLetterId?: string) => {
+  // resumeId/coverLetterId are optional: /api/jobs/apply now just logs a manual "I clicked
+  // through and applied" record — it no longer round-trips resume content through the AI
+  // service (see CLAUDE.md "Product decisions (locked)" — click-out apply, not auto-apply).
+  applyToJob: async (jobId: string, userId: string, resumeId?: string, coverLetterId?: string) => {
     const params = new URLSearchParams();
     params.append('jobId', jobId);
     params.append('userId', userId);
-    params.append('resumeId', resumeId);
+    if (resumeId) params.append('resumeId', resumeId);
     if (coverLetterId) params.append('coverLetterId', coverLetterId);
 
     const response = await fetch(`${API_BASE_URL}/api/jobs/apply`, {
@@ -427,12 +353,24 @@ export const jobAPI = {
       },
       body: params,
     });
-    // JobController.applyToJob returns 403 (email not verified), 500 (application errors,
-    // e.g. duplicate application / no resume content), etc. — without this check those error
-    // bodies were being returned to callers as if they were successful application records.
+    // JobController.applyToJob returns 403 (email not verified), 500 with a JobGenieException
+    // error body (e.g. { error: "DUPLICATE_APPLICATION", message: "..." }), etc. — without this
+    // check those error bodies were being returned to callers as if they were successful
+    // application records.
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `Apply failed (${response.status})`);
+      let friendly = text || `Apply failed (${response.status})`;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.error === 'DUPLICATE_APPLICATION') {
+          friendly = "You've already applied to this job.";
+        } else if (parsed?.message) {
+          friendly = parsed.message;
+        }
+      } catch {
+        // Not JSON — fall back to the raw text above.
+      }
+      throw new Error(friendly);
     }
     return response.json();
   },
@@ -444,6 +382,42 @@ export const jobAPI = {
     params.append('size', size.toString());
 
     const response = await fetch(`${API_BASE_URL}/api/jobs/applications?${params}`);
+    return response.json();
+  },
+
+  // Moves a logged application through the tracker: APPLIED -> INTERVIEWING -> OFFER /
+  // REJECTED / WITHDRAWN. Status is normalized to uppercase server-side, but we send it
+  // uppercase anyway for clarity. Mirrors applyToJob's error handling: JobController returns
+  // a JSON body ({ timestamp, status, error, message }) for 400 (invalid status), 404 (no such
+  // application), and 403 (application belongs to another user).
+  updateApplicationStatus: async (
+    applicationId: string | number,
+    userId: string | number,
+    status: string,
+  ) => {
+    const params = new URLSearchParams();
+    params.append('userId', String(userId));
+    params.append('status', status.toUpperCase());
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/jobs/applications/${applicationId}/status?${params}`,
+      { method: 'PATCH' },
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      let friendly = text || `Status update failed (${response.status})`;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.message) {
+          friendly = parsed.message;
+        } else if (parsed?.error) {
+          friendly = parsed.error;
+        }
+      } catch {
+        // Not JSON — fall back to the raw text above.
+      }
+      throw new Error(friendly);
+    }
     return response.json();
   },
 

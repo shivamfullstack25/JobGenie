@@ -16,7 +16,6 @@ import Preferences from "@/pages/preferences";
 import Automation from "@/pages/automation";
 import CareerMentor from "@/pages/career-mentor";
 import Profile from "@/pages/profile";
-import RealAutomation from "@/pages/real-automation";
 import MarketIntelligence from "@/pages/market-intelligence";
 import AdminPage from "@/pages/admin";
 import About from "@/pages/about";
@@ -42,7 +41,6 @@ function Router() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/preferences" component={Preferences} />
       <Route path="/automation" component={Automation} />
-      <Route path="/real-automation" component={RealAutomation} />
       <Route path="/job-aggregator" component={JobAggregator} />
       <Route path="/career-mentor" component={CareerMentor} />
       <Route path="/market-intelligence" component={MarketIntelligence} />

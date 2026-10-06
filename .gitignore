@@ -368,14 +368,14 @@ test-integration.sh
 setup.sh
 setup-local.md
 
-# Old nginx config (now in frontend)
-nginx.conf
+# Old root-level nginx config (the frontend's own nginx.conf is required by its Dockerfile)
+/nginx.conf
 
 # SSL directory (if not needed for development)
 ssl/
 
-# App directory (if not used)
-app/
+# NOTE: do not ignore `app/` here - JobGenie-AI/app/ is the AI service's source code.
+# Only the root-level secrets directory is ignored (see app/secrets/* above).
 
 # =========================================================
 # 📁 MAVEN REPOSITORY CACHES

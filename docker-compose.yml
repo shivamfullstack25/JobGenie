@@ -204,12 +204,24 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      # Core AI Configuration
+      # Core AI Configuration — Groq (free) tried first, then Gemini (free
+      # tier), then paid OpenAI — see crew_ai_service.py's select_llm() for
+      # the full cost-ascending priority chain.
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LLM_PROVIDER: ${LLM_PROVIDER:-auto}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
-      
+
+      # Job listings — Adzuna (licensed, free tier) used when configured, else
+      # falls back to the cached scraper path. See CLAUDE.md "Product decisions
+      # (locked)".
+      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
+      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
+
       # AI Service Features
       ENABLE_VECTOR_STORAGE: ${ENABLE_VECTOR_STORAGE:-false}
       ENABLE_MEMORY: ${ENABLE_MEMORY:-true}

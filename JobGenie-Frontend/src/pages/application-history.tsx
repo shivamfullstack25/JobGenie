@@ -1,15 +1,52 @@
-import {useQuery} from "@tanstack/react-query";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {jobAPI} from "@/lib/api";
 import {useAuth} from "@/context/AuthContext";
 import {LoadingCard} from "@/components/ui/loading-spinner";
+import {useToast} from "@/hooks/use-toast";
 import {Link} from "wouter";
+
+// Application tracker statuses (job-service's PATCH /api/jobs/applications/{id}/status
+// validates against exactly these, case-insensitive, normalized to uppercase server-side).
+// Each gets a distinct badge treatment so the history list reads at a glance.
+const APPLICATION_STATUSES = [
+  "APPLIED",
+  "INTERVIEWING",
+  "OFFER",
+  "REJECTED",
+  "WITHDRAWN",
+] as const;
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  APPLIED: "bg-gray-100 text-gray-800 border-gray-200",
+  INTERVIEWING: "bg-blue-100 text-blue-800 border-blue-200",
+  OFFER: "bg-green-100 text-green-800 border-green-200",
+  REJECTED: "bg-red-100 text-red-800 border-red-200",
+  WITHDRAWN: "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  APPLIED: "Applied",
+  INTERVIEWING: "Interviewing",
+  OFFER: "Offer",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+};
 
 export default function ApplicationHistory() {
   const { backendUser, loading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ["applications", backendUser?.id],
@@ -18,6 +55,33 @@ export default function ApplicationHistory() {
       return jobAPI.getUserApplications(backendUser.id.toString(), 1, 50);
     },
     enabled: !!backendUser?.id,
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({
+      applicationId,
+      status,
+    }: {
+      applicationId: string | number;
+      status: string;
+    }) => {
+      if (!backendUser?.id) throw new Error("Not logged in");
+      return jobAPI.updateApplicationStatus(applicationId, backendUser.id, status);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", backendUser?.id] });
+      toast({
+        title: "Status updated",
+        description: `Marked as ${STATUS_LABELS[variables.status] || variables.status}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Couldn't update status",
+        description: error?.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: savedJobs = [], isLoading: savedLoading } = useQuery({
@@ -63,20 +127,57 @@ export default function ApplicationHistory() {
             {!Array.isArray(applications) || applications.length === 0 ? (
               <p className="text-gray-500">No applications yet.</p>
             ) : (
-              applications.map((app: any) => (
-                <div
-                  key={app.id || `${app.jobId}-${app.appliedAt}`}
-                  className="flex items-center justify-between border-b border-gray-100 py-3"
-                >
-                  <div>
-                    <p className="font-medium">Job #{app.jobId}</p>
-                    <p className="text-sm text-gray-500">
-                      {app.platform || "Unknown platform"} · {app.appliedAt || "—"}
-                    </p>
+              applications.map((app: any) => {
+                const currentStatus = (app.status || "APPLIED").toUpperCase();
+                const isUpdating =
+                  updateStatusMutation.isPending &&
+                  updateStatusMutation.variables?.applicationId === app.id;
+                return (
+                  <div
+                    key={app.id || `${app.jobId}-${app.appliedAt}`}
+                    className="flex items-center justify-between border-b border-gray-100 py-3 gap-4"
+                  >
+                    <div>
+                      <p className="font-medium">Job #{app.jobId}</p>
+                      <p className="text-sm text-gray-500">
+                        {app.platform || "Unknown platform"} · {app.appliedAt || "—"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        className={
+                          STATUS_BADGE_CLASSES[currentStatus] ||
+                          STATUS_BADGE_CLASSES.APPLIED
+                        }
+                      >
+                        {STATUS_LABELS[currentStatus] || currentStatus}
+                      </Badge>
+                      <Select
+                        value={currentStatus}
+                        disabled={isUpdating || !app.id}
+                        onValueChange={(value) => {
+                          if (!app.id || value === currentStatus) return;
+                          updateStatusMutation.mutate({
+                            applicationId: app.id,
+                            status: value,
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {APPLICATION_STATUSES.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {STATUS_LABELS[status]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <Badge>{app.status || "APPLIED"}</Badge>
-                </div>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>

@@ -224,24 +224,11 @@ export default function Preferences() {
             </CardContent>
           </Card>
 
-          {/* Automation Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Automation Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-base font-medium">Auto-Apply to Jobs</Label>
-                  <p className="text-sm text-gray-600">Automatically apply to highly matching jobs (requires platform credentials)</p>
-                </div>
-                <Switch
-                  checked={preferences.autoApplyEnabled}
-                  onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, autoApplyEnabled: checked }))}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Note: the old "Auto-Apply to Jobs (requires platform credentials)" toggle was
+              removed here — JobGenie doesn't collect job-site credentials or auto-apply on the
+              user's behalf (see CLAUDE.md "Product decisions (locked)"); that toggle never
+              gated a real feature. autoApplyEnabled stays in state/payload as an inert `false`
+              so the /api/preferences contract is unchanged. */}
 
           {/* Skills & Job Criteria */}
           <Card>
