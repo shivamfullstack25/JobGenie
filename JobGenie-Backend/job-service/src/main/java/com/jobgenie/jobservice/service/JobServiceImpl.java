@@ -178,7 +178,7 @@ public class JobServiceImpl implements JobService {
 
   @Override
   public JobApplicationDto applyToJob(
-      String jobId, String userId, String resumeId, String coverLetterId) {
+      String jobId, String userId, String resumeId, String coverLetterId, String requestedPlatform) {
     try {
       log.info(
           "Logging manual application: jobId={}, userId={}, resumeId={}, coverLetterId={}",
@@ -194,12 +194,17 @@ public class JobServiceImpl implements JobService {
 
       // Was hardcoded to "LinkedIn" regardless of where the job actually came from, mislabeling
       // every Indeed/Naukri/etc. application in the applications table and history UI.
+      // The caller knows where the user really applied (jobs found through the discovery
+      // endpoints are not stored here); fall back to the stored job, then to "Unknown" — never to a
+      // guess that mislabels the application.
       String platform =
-          jobRepository
-              .findByJobId(jobId)
-              .map(Job::getPlatform)
-              .filter(p -> p != null && !p.isBlank())
-              .orElse("LinkedIn");
+          requestedPlatform != null && !requestedPlatform.isBlank()
+              ? requestedPlatform.trim()
+              : jobRepository
+                  .findByJobId(jobId)
+                  .map(Job::getPlatform)
+                  .filter(p -> p != null && !p.isBlank())
+                  .orElse("Unknown");
 
       // JobGenie is a metasearch/click-out product (see CLAUDE.md "Product decisions
       // (locked)"): the user applies on the destination site themselves. This just records

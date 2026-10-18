@@ -10,8 +10,17 @@ public interface JobService {
 
   java.util.Map<String, Object> getJobMatchesResponse(String userId, String resumeId);
 
+  /**
+   * Records that the user applied to a job. {@code platform} is where they actually applied (e.g.
+   * "greenhouse"); when absent it is looked up from the stored job.
+   */
   com.jobgenie.shared.dto.JobApplicationDto applyToJob(
-      String jobId, String userId, String resumeId, String coverLetterId);
+      String jobId, String userId, String resumeId, String coverLetterId, String platform);
+
+  default com.jobgenie.shared.dto.JobApplicationDto applyToJob(
+      String jobId, String userId, String resumeId, String coverLetterId) {
+    return applyToJob(jobId, userId, resumeId, coverLetterId, null);
+  }
 
   List<com.jobgenie.shared.dto.JobApplicationDto> getUserApplications(
       String userId, int page, int size);

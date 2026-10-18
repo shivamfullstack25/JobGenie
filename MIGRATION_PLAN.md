@@ -2,6 +2,17 @@
 
 **Date:** 2026-10-06 · Companion to `PROJECT_AUDIT.md`, `ARCHITECTURE_MAP.md`, `docs/platform-compliance.md`.
 
+## Status (updated 2026-10-18)
+
+| Phase | State |
+|---|---|
+| 1A Safety net | Authentication enforced end to end, AI code tracked, test harnesses and CI in place. **Open:** Flyway baseline, characterization tests. See `docs/migration-notes/phase-1a.md`. |
+| 1B Profile, versions, resume | CandidateProfile + provenance + versions + rollback + YAML + resume-fill + ResumeAgent tailoring done. **Open:** ResumeVersion storage, async parse, `LLMProvider`. |
+| 2 Job intelligence | NormalizedJob, Greenhouse/Lever/Ashby adapters, dedup, safety, hybrid matching, policy + kill switches, Discover page done. **Open:** Adzuna adapter + attribution, scraper removal, embeddings provider. |
+| 3-7 | Not started. |
+
+Nothing above has yet been verified against the running Docker stack; see `docs/migration-notes/phase-1b-and-2.md`.
+
 ## Principles
 
 1. **Additive first.** New tables, new endpoints, new pages land beside the old ones. Old paths are removed only after the new path has been the default for a full phase.

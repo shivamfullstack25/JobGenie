@@ -243,6 +243,14 @@ services:
       ADZUNA_APP_ID: ${ADZUNA_APP_ID}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
 
+      # Job boards to search (public ATS feeds): comma-separated platform:token[:Company Name],
+      # e.g. greenhouse:stripe,lever:netflix. See docs/platform-compliance.md for what is permitted.
+      JOB_BOARDS: ${JOB_BOARDS:-}
+      # Automation kill switches. Safe defaults: nothing runs unattended, nothing is ever submitted.
+      GLOBAL_AUTOMATION_ENABLED: ${GLOBAL_AUTOMATION_ENABLED:-false}
+      DRY_RUN: ${DRY_RUN:-true}
+      DISABLED_PLATFORMS: ${DISABLED_PLATFORMS:-}
+
       # AI Service Features
       ENABLE_VECTOR_STORAGE: ${ENABLE_VECTOR_STORAGE:-false}
       ENABLE_MEMORY: ${ENABLE_MEMORY:-true}

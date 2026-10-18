@@ -339,10 +339,11 @@ export const jobAPI = {
   // resumeId/coverLetterId are optional: /api/jobs/apply now just logs a manual "I clicked
   // through and applied" record — it no longer round-trips resume content through the AI
   // service (see CLAUDE.md "Product decisions (locked)" — click-out apply, not auto-apply).
-  applyToJob: async (jobId: string, userId: string, resumeId?: string, coverLetterId?: string) => {
+  applyToJob: async (jobId: string, userId: string, resumeId?: string, coverLetterId?: string, platform?: string) => {
     const params = new URLSearchParams();
     params.append('jobId', jobId);
     params.append('userId', userId);
+    if (platform) params.append('platform', platform);
     if (resumeId) params.append('resumeId', resumeId);
     if (coverLetterId) params.append('coverLetterId', coverLetterId);
 
@@ -623,6 +624,60 @@ export const resumeAgentAPI = {
       }
       throw new Error(message || `Tailoring failed (${response.status})`);
     }
+    return response.json();
+  },
+};
+
+// Job discovery (AI service, via /ai/**): permitted public job-board feeds only, each result
+// normalised, de-duplicated, safety-scored and (given a profile) matched with its reasoning.
+export interface DiscoveredJob {
+  job: {
+    job_id: string; source: string; source_job_id: string | null; url: string; application_url: string;
+    company: string; title: string; description: string; location: string; remote_type: string;
+    salary_min: number | null; salary_max: number | null; currency: string | null;
+    posted_date: string | null; ats_type: string | null; visa_sponsorship: boolean | null;
+    required_skills: string[];
+  };
+  safety: { risk_score: number; level: 'LOW' | 'MEDIUM' | 'HIGH'; reasons: string[]; blocks_automation: boolean };
+  match: {
+    match_score: number; recommendation: string; confidence: number; strengths: string[]; weaknesses: string[];
+    missing_skills: string[]; salary_fit: string; location_fit: string; visa_fit: string; career_fit: string;
+    tiers_used: string[];
+  } | null;
+}
+
+export interface DiscoveryResult {
+  total: number;
+  jobs: DiscoveredJob[];
+  duplicate_groups: { survivor: string; duplicates: string[]; reasons: string[] }[];
+  skipped: { platform: string; reason: string }[];
+  errors: { platform: string; error: string }[];
+}
+
+export interface PlatformPolicyInfo {
+  platform: string; search: string; profileUpdate: string; apply: string; sourceUrl: string; reviewedOn: string; notes: string;
+}
+
+export const discoveryAPI = {
+  discover: async (body: {
+    keywords: string[]; location: string; boards: string[]; profile?: Record<string, unknown>; limit?: number;
+  }): Promise<DiscoveryResult> => {
+    const response = await fetch(`${API_BASE_URL}/ai/v2/jobs/discover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text;
+      try { message = JSON.parse(text).detail ?? text; } catch { /* not JSON */ }
+      throw new Error(message || `Search failed (${response.status})`);
+    }
+    return response.json();
+  },
+  policies: async (): Promise<{ switches: { globalAutomationEnabled: boolean; dryRun: boolean; disabledPlatforms: string[] }; policies: PlatformPolicyInfo[] }> => {
+    const response = await fetch(`${API_BASE_URL}/ai/v2/platforms/policies`);
+    if (!response.ok) throw new Error(`Could not load platform policies (${response.status})`);
     return response.json();
   },
 };

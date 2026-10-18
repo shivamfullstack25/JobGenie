@@ -166,7 +166,10 @@ public class JobController {
       @Parameter(description = "Resume ID used, if any") @RequestParam(required = false)
           String resumeId,
       @Parameter(description = "Cover letter ID, if any") @RequestParam(required = false)
-          String coverLetterId) {
+          String coverLetterId,
+      @Parameter(description = "Platform the user applied through, if known")
+          @RequestParam(required = false)
+          String platform) {
     log.info(
         "Applying to job with jobId={}, userId={}, resumeId={}, coverLetterId={}",
         jobId,
@@ -177,7 +180,8 @@ public class JobController {
       throw new ResponseStatusException(
           HttpStatus.FORBIDDEN, "Please verify your email to use this feature");
     }
-    JobApplicationDto application = jobService.applyToJob(jobId, userId, resumeId, coverLetterId);
+    JobApplicationDto application =
+        jobService.applyToJob(jobId, userId, resumeId, coverLetterId, platform);
     log.info(
         "Successfully applied to job with jobId={}, userId={}, resumeId={}, coverLetterId={}",
         jobId,

@@ -18,6 +18,7 @@ export default function Navigation() {
   const mainNavItems = [
     { path: "/dashboard", label: "Dashboard", icon: "🏠" },
     { path: "/job-matches", label: "Jobs", icon: "💼" },
+    { path: "/job-discovery", label: "Discover", icon: "🔎" },
     { path: "/application-history", label: "History", icon: "📋" },
     { path: "/candidate-profile", label: "My Profile", icon: "🧬" },
     { path: "/resume-assistant", label: "AI Assistant", icon: "🤖" },
