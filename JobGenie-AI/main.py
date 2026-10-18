@@ -386,6 +386,86 @@ async def tailor_resume(request: TailorResumeRequest):
     return {"document": document, "text": resume_agent.to_text(document)}
 
 
+# --- Job intelligence (permitted sources only; see docs/platform-compliance.md) ---------------
+# Boards are public ATS job feeds (Greenhouse / Lever / Ashby). LinkedIn, Indeed, Naukri and the
+# other restricted platforms have no adapter and cannot be requested.
+class DiscoverJobsRequest(BaseModel):
+    keywords: List[str] = []
+    location: str = ""
+    boards: Optional[List[str]] = None  # e.g. ["greenhouse:stripe", "lever:netflix:Netflix"]
+    profile: Optional[Dict[str, Any]] = None
+    limit: int = 50
+
+
+_BOARD_TOKEN = __import__("re").compile(r"^(greenhouse|lever|ashby):[A-Za-z0-9_-]{1,64}(:[A-Za-z0-9 .&_-]{1,64})?$")
+_discovery_cache: Dict[str, Any] = {}
+
+
+def _get_discovery(board_specs: List[str]):
+    from app.jobs.adapters import HttpFetcher, parse_board_spec
+    from app.jobs.discovery import JobDiscovery
+
+    key = ",".join(sorted(board_specs))
+    if key not in _discovery_cache:
+        fetcher = HttpFetcher()
+        _discovery_cache[key] = JobDiscovery(parse_board_spec(",".join(board_specs), fetcher))
+    return _discovery_cache[key]
+
+
+@app.post("/ai/v2/jobs/discover")
+async def discover_jobs(request: DiscoverJobsRequest):
+    specs = request.boards or [b.strip() for b in os.getenv("JOB_BOARDS", "").split(",") if b.strip()]
+    if not specs:
+        raise HTTPException(status_code=400, detail="No job boards configured: pass 'boards' or set JOB_BOARDS (e.g. greenhouse:stripe,lever:netflix)")
+    if len(specs) > 20 or not all(_BOARD_TOKEN.match(spec) for spec in specs):
+        raise HTTPException(status_code=400, detail="Boards must look like greenhouse:token, lever:token or ashby:token (max 20)")
+    result = await _get_discovery(specs).discover(
+        request.keywords, request.location, profile=request.profile, limit=max(1, min(request.limit, 200))
+    )
+    return result
+
+
+class MatchJobsRequest(BaseModel):
+    profile: Dict[str, Any]
+    jobs: List[Dict[str, Any]]
+
+
+@app.post("/ai/v2/jobs/match")
+async def match_jobs(request: MatchJobsRequest):
+    from dataclasses import fields
+
+    from app.jobs.matching import rank_jobs
+    from app.jobs.normalized import NormalizedJob
+
+    if len(request.jobs) > 200:
+        raise HTTPException(status_code=413, detail="At most 200 jobs per request")
+    allowed = {f.name for f in fields(NormalizedJob)}
+    try:
+        jobs = [NormalizedJob(**{k: v for k, v in raw.items() if k in allowed}) for raw in request.jobs]
+    except TypeError as exc:
+        raise HTTPException(status_code=400, detail=f"Job is missing required fields: {exc}")
+    return {"matches": rank_jobs(request.profile, jobs)}
+
+
+@app.get("/ai/v2/platforms/policies")
+async def platform_policies():
+    from app.jobs.automation import POLICIES, Switches
+
+    switches = Switches.from_env()
+    return {
+        "switches": {
+            "globalAutomationEnabled": switches.global_automation_enabled,
+            "dryRun": switches.dry_run,
+            "disabledPlatforms": sorted(switches.disabled_platforms),
+        },
+        "policies": [
+            {"platform": p.platform, "search": p.search.name, "profileUpdate": p.profile_update.name, "apply": p.apply.name,
+             "sourceUrl": p.source_url, "reviewedOn": p.reviewed_on, "notes": p.notes}
+            for p in POLICIES.values()
+        ],
+    }
+
+
 @app.post("/api/resume-insights")
 async def get_resume_insights(request: ResumeInsightsRequest):
     """Get detailed resume insights and analysis"""
