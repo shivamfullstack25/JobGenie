@@ -16,6 +16,7 @@ import Preferences from "@/pages/preferences";
 import Automation from "@/pages/automation";
 import CareerMentor from "@/pages/career-mentor";
 import Profile from "@/pages/profile";
+import CandidateProfilePage from "@/pages/candidate-profile";
 import MarketIntelligence from "@/pages/market-intelligence";
 import AdminPage from "@/pages/admin";
 import About from "@/pages/about";
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/career-mentor" component={CareerMentor} />
       <Route path="/market-intelligence" component={MarketIntelligence} />
       <Route path="/profile" component={Profile} />
+      <Route path="/candidate-profile" component={CandidateProfilePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/about" component={About} />

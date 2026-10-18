@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.jobgenie.shared.entities.AuditLog;
 import com.jobgenie.shared.entities.User;
+import com.jobgenie.userservice.profile.CandidateProfileService;
 import com.jobgenie.userservice.repository.AuditLogRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class AccountService {
   private final AuditLogRepository auditLogRepository;
   private final FirebaseAuthService firebaseAuthService;
   private final RestTemplate restTemplate;
+  private final CandidateProfileService candidateProfileService;
 
   @Value("${resume.service.url:http://resume-service:8083}")
   private String resumeServiceUrl;
@@ -80,6 +82,7 @@ public class AccountService {
     export.put("exportedAt", LocalDateTime.now());
     export.put("source", "user-service");
     export.put("profile", profile);
+    export.put("candidateProfile", candidateProfileService.view(user.getId()));
     return export;
   }
 
@@ -98,6 +101,7 @@ public class AccountService {
     int savedJobsDeleted = deleteSavedJobsBestEffort(userId, warnings);
     boolean firebaseDeleted = deleteFirebaseUserBestEffort(user, warnings);
 
+    candidateProfileService.deleteAll(user.getId());
     userService.deleteUser(userId);
 
     AuditLog entry =

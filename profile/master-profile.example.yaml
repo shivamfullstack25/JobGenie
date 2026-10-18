@@ -1,0 +1,66 @@
+# JobGenie master profile — EXAMPLE. Copy to master-profile.yaml (git-ignored) and fill in.
+#
+# This file is the portable form of your CandidateProfile. The database is the source of truth;
+# GET /api/candidate-profile/export produces this format and POST /api/candidate-profile/import
+# reads it.
+#
+# Every field is either a bare value or a block with metadata:
+#   value:            what you want recorded
+#   provenance:       FACT | INFERRED | AI_GENERATED | USER_APPROVED  (see below)
+#   source / confidence / lastUpdated / verifiedByUser   (filled in by JobGenie on export)
+#
+# Provenance — JobGenie never turns a guess into a fact:
+#   FACT           you stated it.
+#   INFERRED       read out of a document (e.g. your resume). Unverified.
+#   AI_GENERATED   written by a language model. Unverified.
+#   USER_APPROVED  suggested by software, then confirmed by you.
+#
+# Importing: by default every value is recorded as INFERRED — a file cannot declare itself true —
+# and any value that disagrees with something you already stated becomes a proposal you approve or
+# reject. Import with confirm=true to declare the whole file to be your own statement.
+#
+# Anything you have not filled in stays USER_INPUT_REQUIRED. JobGenie will not guess it, and will
+# not prepare an application that depends on it.
+#
+# Platform profiles (LinkedIn, Naukri, ...) are generated FROM this file. They never write back
+# into it.
+
+schemaVersion: 1
+profile:
+  identity:
+    fullName: USER_INPUT_REQUIRED
+    headline: USER_INPUT_REQUIRED          # e.g. "Backend engineer — Java, Spring Boot, microservices"
+    summary: USER_INPUT_REQUIRED
+  contact:
+    email: USER_INPUT_REQUIRED
+    phone: USER_INPUT_REQUIRED
+  location:
+    current: USER_INPUT_REQUIRED           # city
+    country: USER_INPUT_REQUIRED
+  workAuthorization:
+    status: USER_INPUT_REQUIRED            # per target country, in your own words
+    visa:                                  # optional, an object, e.g. {country: Germany, type: Blue Card, sponsorshipNeeded: true}
+      value: USER_INPUT_REQUIRED
+  preferences:
+    targetRoles: []                        # e.g. [Senior Software Engineer, Backend Engineer]
+    targetLocations: []                    # e.g. [Bengaluru, Remote, Netherlands]
+    salaryExpectation:                     # object, e.g. {currency: INR, min: 3000000, max: 4000000, period: year}
+      value: USER_INPUT_REQUIRED
+    noticePeriod: USER_INPUT_REQUIRED      # e.g. "60 days"
+    remotePreference: USER_INPUT_REQUIRED  # remote | hybrid | onsite | any
+    willingToRelocate: USER_INPUT_REQUIRED
+  experience: []                           # list of {company, title, start, end, description, achievements: []}
+  education: []                            # list of {institution, degree, field, start, end}
+  certifications: []
+  skills: []                               # list of strings
+  projects: []                             # list of {name, description, url, technologies: []}
+  achievements: []
+  links:
+    portfolio: USER_INPUT_REQUIRED
+    github: USER_INPUT_REQUIRED
+    linkedin: USER_INPUT_REQUIRED
+    naukri: USER_INPUT_REQUIRED
+    cutshort: USER_INPUT_REQUIRED
+    instahyre: USER_INPUT_REQUIRED
+    wellfound: USER_INPUT_REQUIRED
+    other: []

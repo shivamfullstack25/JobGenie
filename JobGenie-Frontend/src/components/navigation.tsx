@@ -19,6 +19,7 @@ export default function Navigation() {
     { path: "/dashboard", label: "Dashboard", icon: "🏠" },
     { path: "/job-matches", label: "Jobs", icon: "💼" },
     { path: "/application-history", label: "History", icon: "📋" },
+    { path: "/candidate-profile", label: "My Profile", icon: "🧬" },
     { path: "/resume-assistant", label: "AI Assistant", icon: "🤖" },
     { path: "/automation", label: "Automation", icon: "⚡" },
     { path: "/about", label: "About", icon: "ℹ️" },

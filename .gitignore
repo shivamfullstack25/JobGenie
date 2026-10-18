@@ -404,3 +404,5 @@ grafana_data/
 # Local development files
 .local/
 local/
+# Personal master profile (the committed template is profile/master-profile.example.yaml)
+/profile/master-profile.yaml

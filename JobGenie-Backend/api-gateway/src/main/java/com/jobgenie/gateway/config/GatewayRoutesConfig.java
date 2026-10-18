@@ -145,6 +145,9 @@ public class GatewayRoutesConfig {
         // CORE MICROSERVICE ROUTES
         // ==================================================
         .route("user-service", r -> r.path("/api/users/**").uri("lb://user-service"))
+        .route(
+            "candidate-profile",
+            r -> r.path("/api/candidate-profile/**").uri("lb://user-service"))
         // Frontend aliases → user-service
         .route("preferences-alias", r -> r.path("/api/preferences/**").uri("lb://user-service"))
         .route("profile-alias", r -> r.path("/api/profile/**").uri("lb://user-service"))

@@ -349,6 +349,43 @@ async def analyze_resume(file: UploadFile = File(...), user_id: str = Form(...))
         logger.error(f"Error parsing resume for user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- ResumeAgent (role-specific resumes built only from the candidate's own profile) -------------
+# Under /ai/ so the gateway's existing /ai/** route reaches it. Stateless: the caller passes the
+# profile values, and nothing is stored here. See app/agents/resume_agent.py for the guarantees.
+class TailorResumeRequest(BaseModel):
+    profile: Dict[str, Any]
+    preset: str
+    job_description: Optional[str] = None
+    provenance: Optional[Dict[str, str]] = None
+    max_skills: Optional[int] = None
+
+
+@app.get("/ai/v2/resume/presets")
+async def resume_presets():
+    from app.agents.resume_agent import list_presets
+
+    return {"presets": list_presets()}
+
+
+@app.post("/ai/v2/resume/tailor")
+async def tailor_resume(request: TailorResumeRequest):
+    from app.agents import resume_agent
+
+    if len(json.dumps(request.profile, default=str)) > 200_000 or len(request.job_description or "") > 20_000:
+        raise HTTPException(status_code=413, detail="Profile or job description is too large")
+    try:
+        document = resume_agent.tailor(
+            request.profile,
+            request.preset,
+            request.job_description,
+            provenance=request.provenance,
+            max_skills=request.max_skills,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"document": document, "text": resume_agent.to_text(document)}
+
+
 @app.post("/api/resume-insights")
 async def get_resume_insights(request: ResumeInsightsRequest):
     """Get detailed resume insights and analysis"""

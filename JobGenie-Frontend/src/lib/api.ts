@@ -486,6 +486,147 @@ export const jobAPI = {
   },
 };
 
+// Candidate Profile APIs (user-service). The profile is the canonical record of the candidate:
+// every fact carries provenance, and software can only ever propose changes to facts the user has
+// stated. The Authorization header is added by lib/authFetch, so these only carry the user id.
+export type Provenance = 'FACT' | 'INFERRED' | 'AI_GENERATED' | 'USER_APPROVED';
+
+export interface ProfileFact {
+  value: unknown;
+  provenance: Provenance | null;
+  source: string | null;
+  confidence: number | null;
+  lastUpdated: string | null;
+  verifiedByUser: boolean;
+}
+
+export interface CandidateProfileView {
+  userId: number;
+  version: number;
+  updatedAt: string | null;
+  facts: Record<string, ProfileFact>;
+  missingRequired: string[];
+  pendingProposals: number;
+}
+
+export interface ProfileProposal {
+  id: number;
+  field: string;
+  proposedValue: unknown;
+  currentValue: unknown;
+  provenance: Provenance;
+  source: string;
+  confidence: number | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface ProfileVersionEntry {
+  id: number;
+  version: number;
+  author: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+async function profileRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/api/candidate-profile${path}`, init);
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text || `Request failed (${response.status})`;
+    try {
+      message = JSON.parse(text)?.message ?? message;
+    } catch {
+      // not JSON
+    }
+    throw new Error(message);
+  }
+  const type = response.headers.get('content-type') ?? '';
+  return (type.includes('json') ? response.json() : response.text()) as Promise<T>;
+}
+
+const jsonBody = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export const profileAPI = {
+  get: (userId: number | string) =>
+    profileRequest<CandidateProfileView>(`?userId=${userId}`),
+  schema: () =>
+    profileRequest<{ fields: Record<string, 'SCALAR' | 'LIST' | 'OBJECT'>; requiredForApplications: string[] }>('/schema'),
+  setField: (userId: number | string, field: string, value: unknown, reason?: string) =>
+    profileRequest<unknown>(`/fields?userId=${userId}`, { ...jsonBody({ field, value, reason }), method: 'PUT' }),
+  approveField: (userId: number | string, field: string) =>
+    profileRequest<unknown>(`/fields/approve?userId=${userId}`, jsonBody({ field })),
+  proposals: (userId: number | string) =>
+    profileRequest<ProfileProposal[]>(`/proposals?userId=${userId}`),
+  decideProposal: (userId: number | string, id: number, approve: boolean) =>
+    profileRequest<unknown>(`/proposals/${id}/decision?userId=${userId}`, jsonBody({ approve })),
+  versions: (userId: number | string) =>
+    profileRequest<ProfileVersionEntry[]>(`/versions?userId=${userId}`),
+  rollback: (userId: number | string, version: number) =>
+    profileRequest<{ currentVersion: number }>(`/rollback?userId=${userId}`, jsonBody({ version })),
+  importResume: (userId: number | string) =>
+    profileRequest<{ applied: number; proposed: number; unchanged: number; errors: string[] }>(
+      `/import-resume?userId=${userId}`,
+      { method: 'POST' },
+    ),
+  exportYaml: (userId: number | string) => profileRequest<string>(`/export?userId=${userId}`),
+  importYaml: (userId: number | string, yaml: string, confirm: boolean) =>
+    profileRequest<{ applied: number; proposed: number; unchanged: number; errors: string[] }>(
+      `/import?userId=${userId}&confirm=${confirm}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/x-yaml' }, body: yaml },
+    ),
+};
+
+// Resume tailoring (AI service, via the gateway's /ai/** route). Stateless: the profile values are
+// sent with the request. The result only ever contains things from the profile.
+export interface TailoredResume {
+  document: {
+    preset: string;
+    label: string;
+    skills: string[];
+    missing: string[];
+    unverified_fields: string[];
+    discarded_rewrites: string[];
+    violations: string[];
+  };
+  text: string;
+}
+
+export const resumeAgentAPI = {
+  presets: async (): Promise<{ id: string; label: string }[]> => {
+    const response = await fetch(`${API_BASE_URL}/ai/v2/resume/presets`);
+    if (!response.ok) throw new Error(`Could not load role presets (${response.status})`);
+    return (await response.json()).presets;
+  },
+  tailor: async (
+    profile: Record<string, unknown>,
+    preset: string,
+    jobDescription?: string,
+    provenance?: Record<string, string>,
+  ): Promise<TailoredResume> => {
+    const response = await fetch(`${API_BASE_URL}/ai/v2/resume/tailor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile, preset, job_description: jobDescription || null, provenance }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text;
+      try {
+        message = JSON.parse(text).detail ?? text;
+      } catch {
+        // not JSON
+      }
+      throw new Error(message || `Tailoring failed (${response.status})`);
+    }
+    return response.json();
+  },
+};
+
 // User Service APIs
 export const userAPI = {
   createUser: async (userData: any) => {

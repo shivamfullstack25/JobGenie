@@ -17,6 +17,8 @@ except ImportError:
         Tool = None  # type: ignore
 from typing import Dict, List, Any, Optional
 
+from app.agents.lexicon import SKILL_KEYWORDS
+
 logger = logging.getLogger(__name__)
 
 def select_llm():
@@ -149,17 +151,7 @@ class HeuristicLLM:
 
 
 # Common skills used for rule-based extraction when no LLM is available.
-_HEURISTIC_SKILL_KEYWORDS = [
-    "python", "java", "javascript", "typescript", "react", "angular", "vue",
-    "node.js", "node", "spring boot", "spring", "django", "flask", "fastapi",
-    "sql", "postgresql", "mysql", "mongodb", "redis", "docker", "kubernetes",
-    "aws", "azure", "gcp", "terraform", "jenkins", "git", "ci/cd", "kafka",
-    "rabbitmq", "graphql", "rest api", "microservices", "html", "css",
-    "c++", "c#", "go", "golang", "rust", "php", "ruby", "swift", "kotlin",
-    "machine learning", "deep learning", "tensorflow", "pytorch", "pandas",
-    "numpy", "data analysis", "agile", "scrum", "linux", "bash", "leadership",
-    "communication", "project management", "problem solving", "teamwork",
-]
+_HEURISTIC_SKILL_KEYWORDS = SKILL_KEYWORDS
 
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _PHONE_RE = re.compile(r"(\+?\d[\d\-.\s()]{7,}\d)")
