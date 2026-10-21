@@ -1,156 +1,177 @@
 import {Link, useLocation} from "wouter";
 import {Button} from "@/components/ui/button";
 import {ThemeToggle} from "@/components/theme-toggle";
+import BrandMark from "@/components/brand-mark";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {Bell, ChevronDown, LogOut, Settings, User} from "lucide-react";
+import {Bell, ChevronDown, LogOut, Menu, Settings, User} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+
+type NavItem = { path: string; label: string };
+
+// The core loop, in the order a user works through it.
+const LOOP: NavItem[] = [
+  { path: "/dashboard", label: "Dashboard" },
+  { path: "/candidate-profile", label: "My profile" },
+  { path: "/job-discovery", label: "Discover" },
+  { path: "/approvals", label: "Approvals" },
+  { path: "/application-history", label: "History" },
+];
+
+const TOOLS: NavItem[] = [
+  { path: "/job-matches", label: "Job matches" },
+  { path: "/job-aggregator", label: "Job search" },
+  { path: "/resume-assistant", label: "Resume assistant" },
+  { path: "/ats-generator", label: "ATS resume" },
+  { path: "/cover-letters", label: "Cover letters" },
+  { path: "/automation", label: "Search schedules" },
+  { path: "/career-mentor", label: "Career mentor" },
+  { path: "/market-intelligence", label: "Market insights" },
+  { path: "/about", label: "About" },
+];
+
+const ADMIN: NavItem[] = [
+  { path: "/admin", label: "Admin" },
+  { path: "/analytics", label: "Analytics" },
+];
+
+function MenuLinks({ items }: { items: NavItem[] }) {
+  return (
+    <>
+      {items.map((item) => (
+        <DropdownMenuItem key={item.path} asChild>
+          <Link href={item.path} className="w-full cursor-pointer">
+            {item.label}
+          </Link>
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
+}
 
 export default function Navigation() {
   const [location] = useLocation();
   const { isAdmin, logout, backendUser, firebaseUser } = useAuth();
 
-  const mainNavItems = [
-    { path: "/dashboard", label: "Dashboard", icon: "🏠" },
-    { path: "/job-matches", label: "Jobs", icon: "💼" },
-    { path: "/job-discovery", label: "Discover", icon: "🔎" },
-    { path: "/approvals", label: "Approvals", icon: "✅" },
-    { path: "/application-history", label: "History", icon: "📋" },
-    { path: "/candidate-profile", label: "My Profile", icon: "🧬" },
-    { path: "/resume-assistant", label: "AI Assistant", icon: "🤖" },
-    { path: "/automation", label: "Automation", icon: "⚡" },
-    { path: "/about", label: "About", icon: "ℹ️" },
-  ];
-  if (isAdmin) {
-    mainNavItems.push({ path: "/admin", label: "Admin", icon: "🛡️" });
-    mainNavItems.push({ path: "/analytics", label: "Analytics", icon: "📈" });
-  }
-
-  // Secondary "Tools" area — demoted per CLAUDE.md's KEEP/CUT/REBUILD table (these pages stay,
-  // they just don't get primary nav real estate).
-  const toolsItems = [
-    { path: "/ats-generator", label: "ATS Generator" },
-    { path: "/cover-letters", label: "Cover Letters" },
-    { path: "/job-aggregator", label: "Job Search" },
-    { path: "/career-mentor", label: "Career Mentor" },
-    { path: "/market-intelligence", label: "Market Intelligence" },
-  ];
-
   const displayName =
-    backendUser?.name || firebaseUser?.displayName || firebaseUser?.email || "User";
-  const avatarUrl =
-    backendUser?.profileImageUrl ||
-    firebaseUser?.photoURL ||
-    `data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect fill="#e2e8f0" width="64" height="64"/><circle cx="32" cy="24" r="12" fill="#94a3b8"/><ellipse cx="32" cy="56" rx="20" ry="16" fill="#94a3b8"/></svg>`,
-    )}`;
+    backendUser?.name || firebaseUser?.displayName || firebaseUser?.email || "Account";
+  const avatarUrl = backendUser?.profileImageUrl || firebaseUser?.photoURL;
+  const initial = displayName.trim().charAt(0).toUpperCase();
+
   return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50 shadow-sm backdrop-blur-sm bg-white/80 dark:bg-gray-900/80">
-      <div className="max-w-7xl mx-auto px-4 lg:px-6">
-        <div className="flex justify-between items-center h-20 min-w-0">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <Link href="/">
-              <div className="flex items-center cursor-pointer">
-                <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  JobGenie
-                </span>
-              </div>
-            </Link>
-          </div>
+    <nav className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 lg:px-6">
+        <Link href="/dashboard" aria-label="JobGenie dashboard">
+          <BrandMark />
+        </Link>
 
-          {/* Main Navigation - Simplified */}
-          <div className="hidden lg:flex items-center space-x-8 ml-12">
-            {mainNavItems.map((item) => (
-              <Link key={item.path} href={item.path}>
-                <span className={`flex items-center px-4 py-2 rounded-xl text-base font-medium transition-all duration-200 cursor-pointer ${
-                  location === item.path
-                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                    : "text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}>
-                  <span className="mr-2">{item.icon}</span>
-                  {item.label}
-                </span>
+        <div className="hidden h-full items-stretch gap-1 lg:flex">
+          {LOOP.map((item) => {
+            const active = location === item.path;
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center border-b-2 px-3 text-sm font-medium transition-colors ${
+                  active
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
               </Link>
-            ))}
+            );
+          })}
 
-            {/* Tools Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center px-4 py-2 rounded-xl text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  Tools
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 mt-2">
-                {toolsItems.map((item) => (
-                  <DropdownMenuItem key={item.path} asChild>
-                    <Link href={item.path}>
-                      <span className="cursor-pointer w-full py-2">{item.label}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+                More
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">
+              <MenuLinks items={TOOLS} />
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <MenuLinks items={ADMIN} />
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-          {/* Right side - Clean and spacious */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
-            <ThemeToggle />
-            
-            {/* Notifications */}
-            <Link href="/notifications">
-              <Button variant="ghost" size="sm" className="relative p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800">
-                <Bell className="h-5 w-5" />
-              </Button>
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/notifications" aria-label="Notifications">
+              <Bell className="h-5 w-5" />
             </Link>
+          </Button>
 
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <img 
-                    src={avatarUrl} 
-                    alt="Profile" 
-                    className="w-9 h-9 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 flex-shrink-0"
-                  />
-                  <span className="hidden lg:block font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                    {displayName}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="gap-2 px-2" aria-label="Account menu">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+                    {initial}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 mt-2">
-                <DropdownMenuItem asChild>
-                  <Link href="/preferences">
-                    <Settings className="mr-3 h-4 w-4" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile">
-                    <User className="mr-3 h-4 w-4" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                  onClick={() => {
-                    void logout();
-                  }}
-                >
-                  <LogOut className="mr-3 h-4 w-4" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                )}
+                <span className="hidden max-w-[10rem] truncate text-sm font-medium xl:block">{displayName}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  Account
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/preferences" className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Job preferences
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void logout()}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Below lg the loop links are hidden, so everything lives in this menu. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-[80vh] w-56 overflow-y-auto">
+              <MenuLinks items={LOOP} />
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">More</DropdownMenuLabel>
+              <MenuLinks items={TOOLS} />
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <MenuLinks items={ADMIN} />
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </nav>

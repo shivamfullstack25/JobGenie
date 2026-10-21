@@ -1,300 +1,189 @@
-import {Card, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
+import BrandMark from "@/components/brand-mark";
 import {Link} from "wouter";
-import {
-    ArrowRight,
-    Award,
-    Bot,
-    Brain,
-    CheckCircle,
-    Clock,
-    FileText,
-    Info,
-    Rocket,
-    Search,
-    Shield,
-    Sparkles,
-    Target,
-    TrendingUp,
-    Users,
-    Zap
-} from "lucide-react";
+import {Check, ExternalLink, X} from "lucide-react";
+
+const STEPS = [
+  {
+    title: "Build your profile",
+    body: "Upload your resume. Every fact keeps its source, and nothing the software infers counts as fact until you approve it.",
+  },
+  {
+    title: "Discover jobs",
+    body: "Search public company job boards (Greenhouse, Lever, Ashby) and Adzuna. Duplicates are merged and suspicious listings are flagged.",
+  },
+  {
+    title: "Approve what's worth it",
+    body: "Each match comes with a tailored resume, cover letter and answers drawn only from your profile. Anything unknown is left for you to fill in.",
+  },
+  {
+    title: "Track every application",
+    body: "Apply on the employer's site, mark it submitted, then follow it through interviews to an offer or a no.",
+  },
+];
+
+const WONT = [
+  "Submit an application for you.",
+  "Ask for your LinkedIn, Indeed or Naukri password.",
+  "Invent skills, numbers or experience you don't have.",
+  "Scrape job sites that don't allow it.",
+];
+
+/** A static example of the Approvals screen: the moment the product is built around. */
+function ExampleApproval() {
+  return (
+    <figure className="w-full max-w-md justify-self-center lg:justify-self-end">
+      <div className="rounded-lg border bg-card shadow-[0_1px_0_var(--border),0_24px_48px_-24px_hsl(210_31%_13%/0.25)]">
+        <div className="flex items-start justify-between gap-4 border-b p-5">
+          <div>
+            <p className="text-lg font-bold leading-tight">Backend Engineer, Payments</p>
+            <p className="mt-1 text-sm text-muted-foreground">Northwind Labs, Bengaluru (hybrid)</p>
+          </div>
+          <div className="text-right">
+            <p className="tabular text-3xl font-extrabold leading-none text-primary">78</p>
+            <p className="mt-1 text-xs text-muted-foreground">match</p>
+          </div>
+        </div>
+
+        <dl className="space-y-3 p-5 text-sm">
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-muted-foreground">You have</dt>
+            <dd>Java, Spring Boot, PostgreSQL, Kafka</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-muted-foreground">Missing</dt>
+            <dd>Go</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-24 shrink-0 text-muted-foreground">Not scored</dt>
+            <dd>Salary isn't listed, so it's left out of the score</dd>
+          </div>
+        </dl>
+
+        <ul className="space-y-2 border-t p-5 text-sm">
+          <li className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+            Resume tailored from your profile
+          </li>
+          <li className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-primary" aria-hidden="true" />
+            Cover letter drafted
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="rounded-sm bg-signal px-1.5 text-xs font-semibold text-signal-foreground">2</span>
+            answers need your input
+          </li>
+        </ul>
+
+        <div className="flex gap-2 border-t p-5">
+          <span className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            Approve and open job page
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium">Skip</span>
+        </div>
+      </div>
+      <figcaption className="mt-3 text-center text-xs text-muted-foreground lg:text-right">
+        Example approval. You submit on the employer's site, then mark it applied.
+      </figcaption>
+    </figure>
+  );
+}
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Navigation Header */}
-      <header className="bg-white/95 backdrop-blur-md shadow-lg border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
-              <Bot className="h-7 w-7 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">JobGenie</span>
-              <span className="text-xs text-gray-500 font-medium tracking-wide">AI Career Assistant</span>
-            </div>
-          </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/about">
-              <Button variant="ghost" className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-blue-50 transition-all duration-200 group">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center group-hover:from-blue-200 group-hover:to-purple-200 transition-all duration-200">
-                  <Info className="h-4 w-4 text-blue-600" />
-                </div>
-                <span className="font-medium text-gray-700 group-hover:text-blue-600 transition-colors">About</span>
-              </Button>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+          <BrandMark />
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <a href="#how" className="hidden px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
+              How it works
+            </a>
+            <Link href="/about" className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+              About
             </Link>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 px-6 py-3 rounded-xl group">
-              <Link href="/login" className="flex items-center gap-3">
-                <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
-                  <Rocket className="h-3 w-3 text-white" />
-                </div>
-                <span className="font-semibold text-white">Get Started</span>
-              </Link>
+            <Button asChild size="sm">
+              <Link href="/login">Sign in</Link>
             </Button>
           </nav>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-blue-100 rounded-full">
-            <Sparkles className="h-5 w-5 text-blue-600" />
-            <span className="text-blue-700 font-medium">AI-Powered Career Intelligence</span>
+      <main>
+        <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-[1.1fr_1fr] lg:py-24">
+          <div className="max-w-xl">
+            <h1 className="text-4xl font-extrabold leading-[1.05] sm:text-5xl lg:text-6xl">
+              Apply to fewer jobs. Better ones.
+            </h1>
+            <p className="mt-6 text-lg text-muted-foreground">
+              JobGenie reads your real experience, finds roles on public company job boards, shows why each
+              one fits, and prepares a tailored application. You review it and apply on the employer's site.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg">
+                <Link href="/login">Sign in to start</Link>
+              </Button>
+              <Button asChild size="lg" variant="ghost">
+                <a href="#how">See how it works</a>
+              </Button>
+            </div>
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            Land Your
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent block">
-              Dream Job
-            </span>
-            <span className="text-gray-700">with AI</span>
-          </h1>
-          
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Transform your job search with our intelligent multi-agent system that optimizes resumes, 
-            applies to jobs automatically, and provides personalized career guidance 24/7.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="px-8 py-4 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Link href="/login" className="flex items-center gap-2">
-                <Rocket className="h-5 w-5" />
-                Start Your Journey
-              </Link>
+          <ExampleApproval />
+        </section>
+
+        <section id="how" className="scroll-mt-8 border-t bg-card">
+          <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+            <h2 className="text-3xl font-bold">How it works</h2>
+            <ol className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="border-t-2 border-foreground pt-4">
+                  <span className="tabular text-sm font-semibold text-primary">Step {i + 1}</span>
+                  <h3 className="mt-2 text-lg font-bold">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="border-t">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 lg:grid-cols-[1fr_1.4fr] lg:py-20">
+            <div>
+              <h2 className="text-3xl font-bold">What JobGenie won't do</h2>
+              <p className="mt-4 max-w-sm text-muted-foreground">
+                These are product rules, not settings. Your accounts on job sites stay yours.
+              </p>
+            </div>
+            <ul className="divide-y border-y">
+              {WONT.map((line) => (
+                <li key={line} className="flex items-center gap-4 py-4 text-lg">
+                  <X className="h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="border-t bg-primary text-primary-foreground">
+          <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-xl text-2xl font-bold leading-snug">
+              Ten applications you'd stand behind beat a hundred you wouldn't.
+            </p>
+            <Button asChild size="lg" variant="secondary">
+              <Link href="/login">Sign in to start</Link>
             </Button>
           </div>
+        </section>
+      </main>
 
-          {/* Trust Indicators */}
-          <div className="flex flex-wrap justify-center gap-4 mb-16">
-            <Badge variant="secondary" className="bg-green-100 text-green-700 px-4 py-2">
-              <CheckCircle className="mr-2 h-4 w-4" />
-              60-80% Cost Savings
-            </Badge>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 px-4 py-2">
-              <Clock className="mr-2 h-4 w-4" />
-              24/7 Automation
-            </Badge>
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700 px-4 py-2">
-              <Shield className="mr-2 h-4 w-4" />
-              Enterprise Security
-            </Badge>
-          </div>
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground">
+          <BrandMark className="scale-90 origin-left" />
+          <Link href="/about" className="hover:text-foreground">About</Link>
         </div>
-      </section>
-
-      {/* Features Showcase */}
-      <section className="py-16 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Why Choose JobGenie?
-            </h2>
-            <p className="text-xl text-gray-600">
-              Advanced AI technology meets practical job search solutions
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Brain className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Multi-Agent AI System</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Specialized AI agents collaborate on research, resume optimization, 
-                  cover letter writing, and strategic planning for maximum success.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Zap className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Automated Applications</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Real browser automation applies to jobs 24/7 across multiple platforms 
-                  with personalized applications for each opportunity.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Award className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">ATS Optimization</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Advanced resume optimization ensures your applications pass Applicant 
-                  Tracking Systems with intelligent keyword analysis.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature List */}
-      <section className="py-16 px-4 bg-gray-50">
-        <div className="max-w-4xl mx-auto">
-          <Card className="border-0 shadow-xl">
-            <CardContent className="p-12">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                  Everything You Need to Succeed
-                </h2>
-                <p className="text-lg text-gray-600">
-                  Comprehensive AI-powered tools for every step of your job search
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Smart Resume Analysis</h4>
-                      <p className="text-gray-600">AI extracts and optimizes your key information</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Search className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Intelligent Job Matching</h4>
-                      <p className="text-gray-600">Find perfect opportunities based on your profile</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Target className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Cover Letter Generation</h4>
-                      <p className="text-gray-600">Personalized cover letters for every application</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Market Intelligence</h4>
-                      <p className="text-gray-600">Salary insights and industry trend analysis</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                      <Users className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">Career Mentorship</h4>
-                      <p className="text-gray-600">AI-powered guidance and interview preparation</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                      <Clock className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900">24/7 Automation</h4>
-                      <p className="text-gray-600">Continuous job searching while you sleep</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center mt-12">
-                <Link href="/login">
-                  <Button
-                    size="lg"
-                    className="px-8 py-4 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  >
-                    <span className="flex items-center gap-2">
-                      Get Started with JobGenie
-                      <ArrowRight className="h-5 w-5" />
-                    </span>
-                  </Button>
-                </Link>
-                <p className="text-sm text-gray-500 mt-4">
-                  Sign in to access your personalized job search dashboard
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="py-20 px-4 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600">
-        <div className="max-w-4xl mx-auto text-center text-white">
-          <h2 className="text-4xl font-bold mb-6">
-            Ready to Transform Your Career?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join professionals who have accelerated their career success with AI-powered automation.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login">
-              <Button size="lg" variant="secondary" className="px-8 py-4 text-lg">
-                <span className="flex items-center gap-2">
-                  <Rocket className="h-5 w-5" />
-                  Start Free Today
-                </span>
-              </Button>
-            </Link>
-          </div>
-          
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              No Credit Card Required
-            </Badge>
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              Free AI Testing
-            </Badge>
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              Enterprise Security
-            </Badge>
-          </div>
-        </div>
-      </section>
+      </footer>
     </div>
   );
 }

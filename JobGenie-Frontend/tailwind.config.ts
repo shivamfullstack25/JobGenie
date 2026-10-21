@@ -25,6 +25,10 @@ export default {
           DEFAULT: "var(--primary)",
           foreground: "var(--primary-foreground)",
         },
+        signal: {
+          DEFAULT: "var(--signal)",
+          foreground: "var(--signal-foreground)",
+        },
         secondary: {
           DEFAULT: "var(--secondary)",
           foreground: "var(--secondary-foreground)",
