@@ -374,12 +374,13 @@ async def tailor_resume(request: TailorResumeRequest):
     if len(json.dumps(request.profile, default=str)) > 200_000 or len(request.job_description or "") > 20_000:
         raise HTTPException(status_code=413, detail="Profile or job description is too large")
     try:
+        options = {} if request.max_skills is None else {"max_skills": request.max_skills}
         document = resume_agent.tailor(
             request.profile,
             request.preset,
             request.job_description,
             provenance=request.provenance,
-            max_skills=request.max_skills,
+            **options,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

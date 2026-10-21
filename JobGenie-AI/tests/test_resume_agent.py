@@ -183,3 +183,11 @@ def test_text_rendering_contains_the_content_and_nothing_else():
     assert "Senior Engineer — Acme — 2019 – Present" in text
     assert "Cut report latency by 40% with Kafka batching" in text
     assert "Rust" not in text
+
+
+def test_skills_default_to_a_focused_list_and_zero_means_all():
+    many = dict(PROFILE, skills=[f"Skill{i}" for i in range(80)] + ["Java"])
+
+    assert len(agent.tailor(many, "java_backend")["skills"]) == agent.DEFAULT_MAX_SKILLS
+    assert "Java" in agent.tailor(many, "java_backend")["skills"], "relevant skills survive the cut"
+    assert len(agent.tailor(many, "java_backend", max_skills=0)["skills"]) == 81

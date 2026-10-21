@@ -33,6 +33,9 @@ ROLE_PRESETS: Dict[str, Dict[str, Any]] = {
     "international": {"label": "International", "keywords": []},
 }
 
+# A tailored resume that lists every skill is not tailored. Callers can pass max_skills=0 for all.
+DEFAULT_MAX_SKILLS = 30
+
 _NUMBER = re.compile(r"\d[\d,.]*%?")
 
 
@@ -144,7 +147,7 @@ def tailor(
     job_description: Optional[str] = None,
     provenance: Optional[Dict[str, str]] = None,
     rewriter: Optional[Callable[[str], str]] = None,
-    max_skills: Optional[int] = None,
+    max_skills: Optional[int] = DEFAULT_MAX_SKILLS,
 ) -> Dict[str, Any]:
     """Build a role-specific resume document from ``profile``.
 
@@ -196,7 +199,7 @@ def tailor(
 
     skills = [str(s) for s in (get("skills") or []) if str(s).strip()]
     skills = _by_relevance(skills, str, terms)
-    if max_skills is not None:
+    if max_skills:  # None or 0 means "keep them all"
         skills = skills[:max_skills]
 
     document: Dict[str, Any] = {
