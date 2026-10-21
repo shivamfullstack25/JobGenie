@@ -55,7 +55,7 @@ export default function ResumeChat({ resumeId, resumeName }: ResumeChatProps) {
     onError: (error) => {
       toast({
         title: "Chat Error",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },

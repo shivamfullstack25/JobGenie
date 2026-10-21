@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCcw, Home, Bug, Mail } from 'lucide-react';
+import {AlertTriangle, RefreshCcw, Home, Bug} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
       };
 
       // Send to your error reporting service
-      await fetch('/api/errors/report', {
+      await fetch('/api/analytics/errors/report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,7 +287,7 @@ export const useErrorHandler = () => {
       type: 'async_error',
     };
 
-    fetch('/api/errors/report', {
+    fetch('/api/analytics/errors/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(errorReport),

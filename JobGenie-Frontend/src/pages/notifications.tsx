@@ -2,13 +2,11 @@ import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import {Card, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Badge} from "@/components/ui/badge";
-import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
 import Navigation from "@/components/navigation";
 import {useAuth} from "@/context/AuthContext";
 
 export default function Notifications() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { backendUser } = useAuth();
   const userId = backendUser?.id;
@@ -20,12 +18,6 @@ export default function Notifications() {
     // unwrap it here so .filter() below doesn't throw on the raw object.
     select: (data: any) => (Array.isArray(data) ? data : (data?.notifications ?? [])),
   });
-
-  const { data: statsData } = useQuery({
-    queryKey: [`/api/notifications/stats/${userId}`],
-    enabled: !!userId,
-  });
-  const unreadCount = (statsData as any)?.unread ?? 0;
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {

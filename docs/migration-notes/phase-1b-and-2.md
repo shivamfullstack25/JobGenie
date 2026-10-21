@@ -47,7 +47,7 @@ Totals at this commit: 61 Java tests, 65 Python tests, 8 frontend tests, fronten
 
 | Item | Note |
 |---|---|
-| **Live verification** | Nothing from 1A, 1B or 2 has been run against the Docker stack, and a real Firebase sign-in has not been exercised. Unit and integration-style tests only. First thing to do: `docker compose build` each service in turn, `bash lean-start.sh`, `bash scripts/smoke-auth.sh`, then sign in and use *My Profile* and *Discover*. |
+| **Live verification** | Nothing from 1A, 1B or 2 has been run against the Docker stack, and a real Firebase sign-in has not been exercised. Unit and integration-style tests only. First thing to do: `docker compose build` each service in turn, `bash start.sh`, `bash scripts/smoke-auth.sh`, then sign in and use *My Profile* and *Discover*. |
 | Flyway baseline; Testcontainers characterization tests | Still on `ddl-auto=update` (1A.3, 1A.2) |
 | Resume upload still parses synchronously and calls the LLM twice | 1B.4 async parse; `ResumeVersion` storage of tailored output |
 | `LLMProvider` abstraction (Anthropic, OpenRouter) and structured outputs | 1B.5. The tailor and match paths accept an injected rewriter/embedder/reasoner but none is wired to a model yet, so today they run on rules only |

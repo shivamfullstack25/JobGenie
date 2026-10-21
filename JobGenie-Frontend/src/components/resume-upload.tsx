@@ -46,8 +46,8 @@ export default function ResumeUpload() {
         summary: resume?.summary || metadata?.summary || '',
       });
       setReviewOpen(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/resumes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      // Every resume list (dashboard, assistant, profile pickers) uses a key mentioning resumes.
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("resumes") });
       setUploadProgress(0);
     },
     onError: (error: any) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, {useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,27 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useApiCache } from '@/hooks/useCache';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  Briefcase, 
-  Target, 
-  BarChart3,
-  PieChart,
-  Activity,
-  Clock,
-  Calendar,
-  Download,
-  RefreshCw,
-  Filter,
-  Search,
-  MapPin,
-  DollarSign,
-  Award,
-  Brain,
-  Zap
-} from 'lucide-react';
+import {TrendingUp, TrendingDown, Users, Briefcase, Target, BarChart3, Activity, Clock, Download, RefreshCw, MapPin, Award, Brain, Zap} from 'lucide-react';
 
 interface AnalyticsData {
   overview: {
@@ -63,11 +43,10 @@ interface AnalyticsData {
 
 export const AnalyticsDashboard: React.FC = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
-  const [selectedMetric, setSelectedMetric] = useState('applications');
   const [refreshing, setRefreshing] = useState(false);
 
   // Real-time data from WebSocket
-  const { isConnected, lastMessage } = useWebSocket({
+  const { isConnected } = useWebSocket({
     onMessage: (message) => {
       if (message.type === 'analytics_update') {
         // Handle real-time analytics updates
@@ -392,13 +371,13 @@ const OverviewCard: React.FC<OverviewCardProps> = ({ title, value, change, icon,
 };
 
 // Chart Components (simplified for brevity)
-const ApplicationTrendChart: React.FC<{ data: any[] }> = ({ data }) => (
+const ApplicationTrendChart: React.FC<{ data: any[] }> = () => (
   <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
     <p className="text-gray-500">Application Trend Chart</p>
   </div>
 );
 
-const JobMatchChart: React.FC<{ data: any[] }> = ({ data }) => (
+const JobMatchChart: React.FC<{ data: any[] }> = () => (
   <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
     <p className="text-gray-500">Job Match Quality Chart</p>
   </div>
@@ -418,13 +397,13 @@ const SkillsAnalysis: React.FC<{ skills: any[] }> = ({ skills }) => (
   </div>
 );
 
-const IndustryChart: React.FC<{ data: any[] }> = ({ data }) => (
+const IndustryChart: React.FC<{ data: any[] }> = () => (
   <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
     <p className="text-gray-500">Industry Performance Chart</p>
   </div>
 );
 
-const LocationChart: React.FC<{ data: any[] }> = ({ data }) => (
+const LocationChart: React.FC<{ data: any[] }> = () => (
   <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
     <p className="text-gray-500">Geographic Distribution Chart</p>
   </div>

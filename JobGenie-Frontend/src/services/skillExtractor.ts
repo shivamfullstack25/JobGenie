@@ -56,26 +56,7 @@ const skillPatterns = {
   ]
 };
 
-export const extractSkillsFromResume = async (resumeText: string, resumeId?: string): Promise<ResumeAnalysis> => {
-  // If we have a resume ID, try to get AI-powered analysis first
-  if (resumeId) {
-    try {
-      const response = await fetch('/api/resumes/analyze-skills', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeId, text: resumeText })
-      });
-      
-      if (response.ok) {
-        const aiAnalysis = await response.json();
-        return aiAnalysis;
-      }
-    } catch (error) {
-      console.warn('AI-powered skill extraction failed, falling back to pattern matching:', error);
-    }
-  }
-
-  // Fallback to pattern-based extraction
+export const extractSkillsFromResume = async (resumeText: string): Promise<ResumeAnalysis> => {
   return extractSkillsWithPatterns(resumeText);
 };
 

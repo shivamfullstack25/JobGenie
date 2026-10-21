@@ -134,7 +134,7 @@ export default function Dashboard() {
   const [profileChecked, setProfileChecked] = useState(false);
 
   // Initialize WebSocket for real-time updates
-  const { isConnected } = useWebSocket({
+  useWebSocket({
     autoConnect: true,
     onMessage: (message) => {
       console.log('Dashboard received WebSocket message:', message);

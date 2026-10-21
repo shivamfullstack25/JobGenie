@@ -1,6 +1,6 @@
 # JobGenie — Migration Plan
 
-**Date:** 2026-10-06 · Companion to `PROJECT_AUDIT.md`, `ARCHITECTURE_MAP.md`, `docs/platform-compliance.md`.
+**Date:** 2026-10-06 · Companion to `audit-2026-10.md`, `architecture.md`, `platform-compliance.md`.
 
 ## Status (updated 2026-10-18)
 
@@ -70,7 +70,7 @@ Nothing above has yet been verified against the running Docker stack; see `docs/
 
 ### 1A.4 Enforce authentication
 - **CURRENT:** No enforcement anywhere; unsigned-JWT fallback; spoofable admin header.
-- **TARGET:** As `ARCHITECTURE_MAP.md` §7.2.
+- **TARGET:** As `architecture.md` §7.2.
 - **STRATEGY, in four releasable steps:**
   1. Frontend: one `authFetch` wrapper attaches the Firebase ID token to every request (replaces scattered `fetch` calls). Harmless while the backend ignores it.
   2. Gateway: verify the token in **report-only** mode: log would-be rejections, enforce nothing. Run until the log is clean.
@@ -172,7 +172,7 @@ Nothing above has yet been verified against the running Docker stack; see `docs/
 
 ## Phase 5 — Platform adapters
 
-- **TARGET:** `NaukriProfileAgent`, `CutshortAdapter`, `InstahyreAdapter`, `LinkedInProfileDraft` and company-career-page handling, all in the modes fixed by `docs/platform-compliance.md` (drafts and user-driven steps). Pages: LinkedIn, Naukri, Cutshort, Instahyre, Platforms. `platform_policies` table seeded from the compliance document, with expiry.
+- **TARGET:** `NaukriProfileAgent`, `CutshortAdapter`, `InstahyreAdapter`, `LinkedInProfileDraft` and company-career-page handling, all in the modes fixed by `platform-compliance.md` (drafts and user-driven steps). Pages: LinkedIn, Naukri, Cutshort, Instahyre, Platforms. `platform_policies` table seeded from the compliance document, with expiry.
 - **STRATEGY:** Each adapter ships with its compliance test before its feature code. Primary terms re-read at build time.
 - **RISKS:** Users expect automation these platforms forbid. The UI states the mode and the reason on every action.
 - **ROLLBACK:** Per-platform flag.

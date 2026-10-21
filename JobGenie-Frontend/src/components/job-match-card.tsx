@@ -40,7 +40,6 @@ export default function JobMatchCard({ job, onApply, onSave, saving, applying }:
   };
 
   const matchScore = job.matchScore || job.matchPercentage || 0;
-  const jobId = job.id || job.jobId;
 
   const formatSource = (source: string) => {
     const known: Record<string, string> = {

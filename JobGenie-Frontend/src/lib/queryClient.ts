@@ -10,14 +10,18 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+type LegacyRequestOptions = { method?: string; body?: unknown; headers?: Record<string, string> };
+
+export async function apiRequest(method: string, url: string, data?: unknown): Promise<Response>;
+export async function apiRequest(url: string, options: LegacyRequestOptions): Promise<Response>;
 export async function apiRequest(
   method: string,
-  url: string,
+  url: string | LegacyRequestOptions,
   data?: unknown | undefined,
 ): Promise<Response> {
   // Support both (method, url, data) and legacy (url, { method, body }) call styles
   let httpMethod = method;
-  let requestUrl = url;
+  let requestUrl = url as string;
   let bodyData: unknown = data;
 
   if (typeof method === "string" && method.startsWith("/") && typeof url === "object") {

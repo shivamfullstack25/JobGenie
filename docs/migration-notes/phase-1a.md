@@ -1,6 +1,6 @@
 # Phase 1A migration notes — Safety net
 
-Branch: `overhaul/phase-1a-safety-net`. Plan reference: `MIGRATION_PLAN.md` §Phase 1A.
+Branch: `overhaul/phase-1a-safety-net`. Plan reference: `../roadmap.md` §Phase 1A.
 
 ## What changed for anyone running the stack
 

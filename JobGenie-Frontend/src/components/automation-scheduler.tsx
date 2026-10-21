@@ -28,9 +28,6 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
   const [location, setLocation] = useState("");
   const [remote, setRemote] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [jobUrl, setJobUrl] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [autoApply, setAutoApply] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -55,7 +52,7 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     onError: (error) => {
       toast({
         title: "Schedule Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },
@@ -75,7 +72,7 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     onError: (error) => {
       toast({
         title: "Update Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },
@@ -91,13 +88,11 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
         title: "Job Search Complete",
         description: `Found ${data.jobsFound} jobs — review and apply from your matches.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/job-applications"] });
     },
     onError: (error) => {
       toast({
         title: "Search Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },
@@ -144,9 +139,6 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     setSalaryMax("");
     setLocation("");
     setRemote(false);
-    setJobUrl("");
-    setScheduleTime("");
-    setAutoApply(false);
   };
 
   const processedResumes = resumes.filter(resume => resume.isProcessed);
@@ -157,31 +149,12 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     { id: "glassdoor", name: "Glassdoor", icon: "fas fa-building" },
   ];
 
-  const handleScheduleJob = () => {
-    if (!selectedResumeId || !jobUrl || !scheduleTime) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    scheduleMutation.mutate({
-      resumeId: selectedResumeId,
-      jobUrl,
-      scheduleTime,
-      autoApply: autoApply,
-    });
-  };
-
   const exportToPDF = () => {
-    if (scheduledJobs.length === 0) return;
+    if (schedules.length === 0) return;
     
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
-    const maxWidth = pageWidth - 2 * margin;
     
     // Add title
     doc.setFontSize(18);
@@ -192,30 +165,30 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 50);
-    doc.text(`Total Scheduled Jobs: ${scheduledJobs.length}`, margin, 60);
+    doc.text(`Total schedules: ${schedules.length}`, margin, 60);
     
     // Add jobs
     doc.setFontSize(11);
     let yPosition = 80;
     
-    scheduledJobs.forEach((job, index) => {
+    schedules.forEach((schedule: any, index: number) => {
       if (yPosition > 250) {
         doc.addPage();
         yPosition = 30;
       }
       
       doc.setFont('helvetica', 'bold');
-      doc.text(`Job ${index + 1}:`, margin, yPosition);
+      doc.text(`Schedule ${index + 1}:`, margin, yPosition);
       yPosition += 8;
-      
+
       doc.setFont('helvetica', 'normal');
-      doc.text(`Resume: ${job.resumeName}`, margin, yPosition);
+      doc.text(`Frequency: ${schedule.frequency ?? "-"}`, margin, yPosition);
       yPosition += 6;
-      doc.text(`Job URL: ${job.jobUrl}`, margin, yPosition);
+      doc.text(`Platforms: ${(schedule.platforms ?? []).join(", ") || "-"}`, margin, yPosition);
       yPosition += 6;
-      doc.text(`Scheduled: ${job.scheduleTime}`, margin, yPosition);
+      doc.text(`Status: ${schedule.status ?? "-"}`, margin, yPosition);
       yPosition += 6;
-      doc.text(`Auto Apply: ${job.autoApply ? 'Yes' : 'No'}`, margin, yPosition);
+      doc.text(`Next run: ${schedule.nextRunAt ?? schedule.next_run ?? "-"}`, margin, yPosition);
       yPosition += 15;
     });
     
@@ -229,10 +202,10 @@ export default function AutomationScheduler({ resumes }: AutomationSchedulerProp
   };
 
   const exportToJSON = () => {
-    if (scheduledJobs.length === 0) return;
+    if (schedules.length === 0) return;
     
     const data = {
-      scheduledJobs,
+      schedules,
       generatedAt: new Date().toISOString(),
     };
     

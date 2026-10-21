@@ -55,7 +55,7 @@ export default function ATSResumeGenerator({ resumes }: ATSResumeGeneratorProps)
     onError: (error) => {
       toast({
         title: "Generation Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },
@@ -83,7 +83,7 @@ export default function ATSResumeGenerator({ resumes }: ATSResumeGeneratorProps)
     onError: (error) => {
       toast({
         title: "Analysis Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },
@@ -132,20 +132,6 @@ export default function ATSResumeGenerator({ resumes }: ATSResumeGeneratorProps)
         title: "Copied",
         description: "Resume content copied to clipboard.",
       });
-    }
-  };
-
-  const downloadResume = () => {
-    if (generatedResume?.content) {
-      const blob = new Blob([generatedResume.content], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ats-optimized-resume-${targetJobTitle.replace(/\s+/g, '-').toLowerCase()}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     }
   };
 

@@ -1,9 +1,7 @@
 import {useQuery} from "@tanstack/react-query";
-import {useState} from "react";
 import Navigation from "@/components/navigation";
 import CoverLetterGenerator from "@/components/cover-letter-generator";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
 import {resumeAPI} from "@/lib/api";
 import { useAuth } from "../context/AuthContext";
 import { LoadingCard } from '@/components/ui/loading-spinner';
@@ -22,7 +20,7 @@ export default function CoverLetters() {
     enabled: !!backendUser?.id,
   });
 
-  const { data: resumes = [], isLoading } = useQuery({
+  const { data: resumes = [] } = useQuery({
     queryKey: ["resumes", backendUser?.id],
     queryFn: async () => {
       if (!backendUser?.id) return [];

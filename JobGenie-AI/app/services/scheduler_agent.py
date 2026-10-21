@@ -16,7 +16,7 @@ class SchedulerAgent:
     """Recurring job searches (search only — no auto-apply, no credentials).
 
     Schedules live in this process's memory, so they are lost on restart; moving them into
-    job-service's database is part of Phase 2 in MIGRATION_PLAN.md.
+    job-service's database is part of Phase 2 in docs/roadmap.md.
 
     Previously this class also built a CrewAI agent and asked an LLM to "optimise" each schedule's
     configuration. That call could never succeed (it used the pre-1.x CrewAI API) and its answer was

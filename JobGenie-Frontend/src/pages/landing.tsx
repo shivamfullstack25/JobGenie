@@ -85,12 +85,6 @@ export default function Landing() {
                 Start Your Journey
               </Link>
             </Button>
-            <Link href="/demo">
-              <Button variant="outline" size="lg" className="px-8 py-4 text-lg border-2 hover:bg-gray-50">
-                <Brain className="mr-2 h-5 w-5" />
-                Watch Live Demo
-              </Button>
-            </Link>
           </div>
 
           {/* Trust Indicators */}
@@ -284,12 +278,6 @@ export default function Landing() {
                   <Rocket className="h-5 w-5" />
                   Start Free Today
                 </span>
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button size="lg" variant="outline" className="px-8 py-4 text-lg border-white text-white hover:bg-white hover:text-blue-600">
-                <Brain className="mr-2 h-5 w-5" />
-                Watch Demo
               </Button>
             </Link>
           </div>

@@ -1,9 +1,7 @@
 import {useQuery} from "@tanstack/react-query";
-import {useState} from "react";
 import Navigation from "@/components/navigation";
 import ResumeChat from "@/components/resume-chat";
 import AutomationScheduler from "@/components/automation-scheduler";
-import MarketIntelligence from "@/components/market-intelligence";
 import ATSResumeGenerator from "@/components/ats-resume-generator";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
@@ -14,7 +12,7 @@ import { LoadingCard } from '@/components/ui/loading-spinner';
 export default function ResumeAssistant() {
   const { backendUser, loading } = useAuth();
 
-  const { data: resumes = [], isLoading } = useQuery({
+  const { data: resumes = [] } = useQuery({
     queryKey: ["resumes", backendUser?.id],
     queryFn: async () => {
       if (!backendUser?.id) return [];
@@ -68,10 +66,6 @@ export default function ResumeAssistant() {
                 <i className="fas fa-robot"></i>
                 <span>Job Automation</span>
               </TabsTrigger>
-              <TabsTrigger value="intelligence" className="flex items-center space-x-2">
-                <i className="fas fa-chart-line"></i>
-                <span>Market Intelligence</span>
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="chat" className="space-y-6">
@@ -92,10 +86,6 @@ export default function ResumeAssistant() {
 
             <TabsContent value="automation">
               <AutomationScheduler resumes={processedResumes} />
-            </TabsContent>
-
-            <TabsContent value="intelligence">
-              <MarketIntelligence />
             </TabsContent>
           </Tabs>
         )}

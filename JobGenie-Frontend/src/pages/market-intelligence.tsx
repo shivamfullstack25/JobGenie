@@ -1,7 +1,6 @@
 import {useState} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
+import {useMutation} from "@tanstack/react-query";
 import {apiRequest} from "@/lib/queryClient";
-import {resumeAPI} from "@/lib/api";
 import {useAuth} from "@/context/AuthContext";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
@@ -11,7 +10,6 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Badge} from "@/components/ui/badge";
 import {Progress} from "@/components/ui/progress";
-import {useToast} from "@/hooks/use-toast";
 import Navigation from "@/components/navigation";
 import {
     ArrowDownRight,
@@ -40,8 +38,7 @@ interface MarketInsight {
 }
 
 export default function MarketIntelligence() {
-  const { toast } = useToast();
-  const { backendUser, loading } = useAuth();
+  const { loading } = useAuth();
   const [analysisFilters, setAnalysisFilters] = useState({
     jobTitle: '',
     industry: '',
@@ -50,15 +47,6 @@ export default function MarketIntelligence() {
     analysisType: 'overview'
   });
 
-  // Fetch user resumes to extract skills
-  const { data: resumes = [] } = useQuery({
-    queryKey: ['user-resumes', backendUser?.id],
-    queryFn: async () => {
-      if (!backendUser?.id) return [];
-      return resumeAPI.getUserResumes(backendUser.id);
-    },
-    enabled: !!backendUser?.id,
-  });
 
   // Market insights mutation
   const insightsMutation = useMutation({

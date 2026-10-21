@@ -203,7 +203,7 @@ class CacheManager {
     try {
       const value = storage.getItem(key);
       if (!value) return null;
-      return serialize ? JSON.parse(value) : value as CacheEntry<T>;
+      return serialize ? JSON.parse(value) : (value as unknown as CacheEntry<T>);
     } catch (error) {
       console.warn('Failed to get cache from storage:', error);
       return null;

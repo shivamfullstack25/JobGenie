@@ -3,27 +3,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import {Badge} from "@/components/ui/badge";
 import {Link} from "wouter";
 import shivamPhoto from "../assets/ShivamKumar_1751151888724.jpg";
-import {
-    Award,
-    Bot,
-    Brain,
-    Clock,
-    FileText,
-    Globe,
-    Lightbulb,
-    Linkedin,
-    Mail,
-    MapPin,
-    Phone,
-    Rocket,
-    Search,
-    Settings,
-    Shield,
-    Target,
-    TrendingUp,
-    Users,
-    Zap
-} from "lucide-react";
+import {Award, Bot, Brain, Clock, FileText, Lightbulb, Linkedin, Mail, MapPin, Phone, Rocket, Search, Settings, Shield, Target, TrendingUp, Users, Zap} from "lucide-react";
 
 export default function About() {
   return (
@@ -54,12 +34,6 @@ export default function About() {
               <Button size="lg" className="px-8 py-3">
                 <Rocket className="mr-2 h-5 w-5" />
                 Start Your Journey
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button variant="outline" size="lg" className="px-8 py-3">
-                <Globe className="mr-2 h-5 w-5" />
-                View Demo
               </Button>
             </Link>
           </div>
@@ -748,12 +722,6 @@ export default function About() {
               <Button size="lg" variant="secondary" className="px-8 py-3">
                 <Rocket className="mr-2 h-5 w-5" />
                 Get Started Today
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button size="lg" variant="outline" className="px-8 py-3 border-white text-white hover:bg-white hover:text-blue-600">
-                <Brain className="mr-2 h-5 w-5" />
-                Explore AI Features
               </Button>
             </Link>
           </div>

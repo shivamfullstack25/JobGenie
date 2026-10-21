@@ -46,4 +46,4 @@ JobGenie performs no submission at any step. `SUBMITTED` is reachable only by a 
 - Application form *reading* and any browser assistance (Phase 6) — deliberately not started; needs explicit re-approval.
 - Interview and Offer records (`interviews`, `offers` tables), notifications on transitions (Phase 4 remainder).
 - Notifications are still the old split between the AI service and notification-service.
-- Not yet verified against the live stack; see the status in `MIGRATION_PLAN.md`.
+- Not yet verified against the live stack; see the status in `../roadmap.md`.

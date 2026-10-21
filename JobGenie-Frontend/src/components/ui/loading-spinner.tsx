@@ -1,6 +1,5 @@
-import React from 'react';
 import { cn } from '@/lib/utils';
-import { Loader2, Briefcase, Brain, FileText, Search, Zap } from 'lucide-react';
+import {Loader2, Brain, FileText, Search, Zap} from 'lucide-react';
 
 export interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';

@@ -10,6 +10,7 @@ import {Separator} from "@/components/ui/separator";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
+import {resumeAPI} from "@/lib/api";
 import Navigation from "@/components/navigation";
 import LocationSearch from "@/components/location-search";
 import {extractSkillsFromResume, formatSkillsForJobSearch} from "@/services/skillExtractor";
@@ -24,7 +25,6 @@ export default function Preferences() {
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
     jobAlerts: true,
-    autoApplyEnabled: false,
     preferredJobTypes: [] as string[],
     salaryRange: { min: 500000, max: 1500000, currency: 'INR' },
     preferredLocations: [] as string[],
@@ -39,13 +39,15 @@ export default function Preferences() {
   // (PreferencesController.getPreferences/updatePreferences) — this previously fetched
   // "/api/preferences" with no userId at all, which the backend rejected. Query is disabled
   // until we know who's logged in so it doesn't fire (and error) during the auth check.
-  const { data: userPreferences, isLoading } = useQuery({
+  const { data: userPreferences, isLoading } = useQuery<Record<string, any>>({
     queryKey: [`/api/preferences?userId=${userId}`],
     enabled: !!userId,
   });
 
-  const { data: resumes } = useQuery({
-    queryKey: ["/api/resumes"],
+  const { data: resumes } = useQuery<any[]>({
+    queryKey: ["user-resumes", userId],
+    queryFn: () => resumeAPI.getUserResumes(Number(userId)),
+    enabled: !!userId,
   });
 
   const updateMutation = useMutation({
@@ -76,7 +78,6 @@ export default function Preferences() {
       setPreferences({
         emailNotifications: userPreferences.emailNotifications ?? true,
         jobAlerts: userPreferences.jobAlerts ?? true,
-        autoApplyEnabled: userPreferences.autoApplyEnabled ?? false,
         preferredJobTypes: userPreferences.preferredJobTypes ?? [],
         salaryRange: userPreferences.salaryRange ?? { min: 500000, max: 1500000, currency: 'INR' },
         preferredLocations: userPreferences.preferredLocations ?? [],
@@ -93,8 +94,8 @@ export default function Preferences() {
     setIsExtractingSkills(true);
     try {
       const selectedResume = resumes.find((r: any) => r.id === resumeId);
-      if (selectedResume && selectedResume.extractedText) {
-        const analysis = await extractSkillsFromResume(selectedResume.extractedText, resumeId);
+      if (selectedResume && selectedResume.content) {
+        const analysis = await extractSkillsFromResume(selectedResume.content);
         const skillsString = formatSkillsForJobSearch(analysis);
         
         setPreferences(prev => ({
@@ -223,12 +224,6 @@ export default function Preferences() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Note: the old "Auto-Apply to Jobs (requires platform credentials)" toggle was
-              removed here — JobGenie doesn't collect job-site credentials or auto-apply on the
-              user's behalf (see CLAUDE.md "Product decisions (locked)"); that toggle never
-              gated a real feature. autoApplyEnabled stays in state/payload as an inert `false`
-              so the /api/preferences contract is unchanged. */}
 
           {/* Skills & Job Criteria */}
           <Card>

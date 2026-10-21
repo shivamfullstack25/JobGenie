@@ -1,6 +1,6 @@
 # JobGenie — Architecture Map
 
-**Date:** 2026-10-06. Sections 1–6 describe the system **as it is**. Section 7 describes the target. Evidence and defects are in `PROJECT_AUDIT.md`.
+**Date:** 2026-10-06. Sections 1–6 describe the system **as it is**. Section 7 describes the target. Evidence and defects are in `audit-2026-10.md`.
 
 ---
 

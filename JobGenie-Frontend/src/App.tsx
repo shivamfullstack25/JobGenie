@@ -28,7 +28,6 @@ const Approvals = lazy(() => import("@/pages/approvals"));
 const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
 const AdminPage = lazy(() => import("@/pages/admin"));
 const About = lazy(() => import("@/pages/about"));
-const Demo = lazy(() => import("@/pages/demo"));
 const JobAggregator = lazy(() => import("@/pages/job-aggregator"));
 const ApplicationHistory = lazy(() => import("@/pages/application-history"));
 const Login = lazy(() => import("@/pages/login"));
@@ -59,7 +58,6 @@ function Router() {
       <Route path="/admin" component={AdminPage} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/about" component={About} />
-      <Route path="/demo" component={Demo} />
       <Route component={NotFound} />
     </Switch>
     </Suspense>

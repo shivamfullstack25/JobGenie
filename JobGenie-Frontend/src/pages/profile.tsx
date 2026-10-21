@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {useMutation} from "@tanstack/react-query";
 import {useLocation} from "wouter";
 import {apiRequest} from "@/lib/queryClient";
 import {Button} from "@/components/ui/button";
@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import Cropper from 'react-easy-crop';
+import Cropper, { type Area } from 'react-easy-crop';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import getCroppedImg from '../utils/cropImage';
 import { useAuth } from "../context/AuthContext";
@@ -55,7 +55,6 @@ const storage = getStorage();
 
 export default function Profile() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     firstName: "",
@@ -81,7 +80,6 @@ export default function Profile() {
     }
   });
 
-  const [resume, setResume] = useState<File | null>(null);
   const [profilePic, setProfilePic] = useState<string>("");
   const [profileLoading, setProfileLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -89,19 +87,19 @@ export default function Profile() {
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const { user, backendUser, logout } = useAuth();
+  const { user, backendUser, logout, refreshBackendUser } = useAuth();
   const [, navigate] = useLocation();
 
-  const onCropComplete = (croppedArea, croppedAreaPixels) => {
+  const onCropComplete = (_croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels);
   };
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const localUser = JSON.parse(localStorage.getItem("firebaseUser") || "null");
+      const localUser = user;
       // Firestore is only still consulted here for fields the user-service record has no
       // equivalent for (profile picture, resume link) — everything else now prefers
       // backendUser (the real user-service/PostgreSQL record from AuthContext) so this page
@@ -144,7 +142,7 @@ export default function Profile() {
       setProfileLoading(false);
     };
     fetchProfile();
-  }, [backendUser]);
+  }, [backendUser, user]);
 
   // Update profile mutation. Backend requires ?userId= on PUT /api/profile
   // (ProfileController.updateProfile) — this previously called the endpoint with no userId at
@@ -164,7 +162,7 @@ export default function Profile() {
         description: "Your profile has been successfully updated.",
       });
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      refreshBackendUser();
     },
     onError: (error: any) => {
       toast({
@@ -194,32 +192,6 @@ export default function Profile() {
       toast({
         title: "Error",
         description: error?.message || "Failed to update settings. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Upload profile picture mutation
-  const uploadProfilePicMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("profilePicture", file);
-      return await apiRequest("/api/profile/upload-picture", {
-        method: "POST",
-        body: formData,
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Profile Picture Updated",
-        description: "Your profile picture has been successfully updated.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to upload profile picture. Please try again.",
         variant: "destructive",
       });
     },
@@ -294,7 +266,7 @@ export default function Profile() {
     // that backendUser (and the rest of the app) reads. Now it does both: Firestore is kept as
     // a best-effort mirror since dashboard.tsx still reads this same doc, and the backend save
     // below is the actual source of truth.
-    const localUser = JSON.parse(localStorage.getItem("firebaseUser") || "null");
+    const localUser = user;
     if (localUser) {
       await setDoc(doc(db, "users", localUser.uid), {
         firstName: profileData.firstName,
@@ -327,7 +299,6 @@ export default function Profile() {
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const user = JSON.parse(localStorage.getItem("firebaseUser") || "null");
     if (!user) return;
     const file = event.target.files?.[0];
     if (file) {
@@ -339,7 +310,6 @@ export default function Profile() {
   const handleCropSave = async () => {
     if (!selectedImage || !croppedAreaPixels) return;
     const croppedBlob = await getCroppedImg(URL.createObjectURL(selectedImage), croppedAreaPixels);
-    const user = JSON.parse(localStorage.getItem("firebaseUser") || "null");
     if (!user) return;
     const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedImage.name}`);
     await uploadBytes(storageRef, croppedBlob);
@@ -352,11 +322,9 @@ export default function Profile() {
   };
 
   const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const user = JSON.parse(localStorage.getItem("firebaseUser") || "null");
     if (!user) return;
     const file = event.target.files?.[0];
     if (file) {
-      setResume(file);
       // Upload to Firebase Storage
       const storageRef = ref(storage, `resumes/${user.uid}/${file.name}`);
       await uploadBytes(storageRef, file);

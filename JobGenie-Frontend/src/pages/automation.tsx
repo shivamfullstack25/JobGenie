@@ -80,9 +80,10 @@ export default function Automation() {
 
   const runScheduleMutation = useMutation({
     mutationFn: async (scheduleId: number) => {
-      return await apiRequest(`/api/automation/run-advanced/${scheduleId}`, {
+      const res = await apiRequest(`/api/automation/run-advanced/${scheduleId}`, {
         method: "POST",
       });
+      return res.json();
     },
     onSuccess: (data) => {
       toast({
@@ -113,7 +114,7 @@ export default function Automation() {
     try {
       const selectedResume = resumes.find((r: any) => r.id === resumeId);
       if (selectedResume && selectedResume.content) {
-        const analysis = await extractSkillsFromResume(selectedResume.content, resumeId.toString());
+        const analysis = await extractSkillsFromResume(selectedResume.content);
         const skillsString = formatSkillsForJobSearch(analysis);
         
         setKeywords(skillsString);

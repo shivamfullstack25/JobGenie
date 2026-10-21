@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {useMutation, useQueryClient} from "@tanstack/react-query";
+import {useMutation} from "@tanstack/react-query";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
@@ -29,7 +29,6 @@ export default function CoverLetterGenerator({ resumes }: CoverLetterGeneratorPr
   const [generatedContent, setGeneratedContent] = useState("");
 
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const generateMutation = useMutation({
     mutationFn: async (data: { resumeId: number; jobTitle: string; company: string; jobDescription: string; tone: string }) => {
@@ -57,12 +56,11 @@ export default function CoverLetterGenerator({ resumes }: CoverLetterGeneratorPr
         title: "Success",
         description: "Cover letter generated successfully!",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/cover-letters"] });
     },
     onError: (error) => {
       toast({
         title: "Generation Failed",
-        description: error.message,
+        description: (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     },

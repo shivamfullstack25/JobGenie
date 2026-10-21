@@ -61,7 +61,8 @@ public class GatewayAuthFilter implements WebFilter, Ordered {
   private static final List<Pattern> ADMIN_ONLY_PATHS =
       List.of(
           Pattern.compile("^/api/admin(/.*)?$"),
-          Pattern.compile("^/api/analytics(/.*)?$"),
+          // Any signed-in user may report a client-side crash; the rest of analytics is admin-only.
+          Pattern.compile("^/api/analytics(?!/errors/report$)(/.*)?$"),
           Pattern.compile("^/api/gateway/(routes|services)$"),
           Pattern.compile("^/actuator(/.*)?$"));
 

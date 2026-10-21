@@ -169,6 +169,22 @@ class GatewayAuthFilterTest {
   }
 
   @Test
+  void anyUserCanReportAClientErrorButNotReadAnalytics() {
+    MockServerWebExchange report =
+        exchange(
+            MockServerHttpRequest.post("/api/analytics/errors/report")
+                .header("Authorization", "Bearer good-7"));
+    assertNotNull(forwarded(filter(AuthMode.ENFORCE), report));
+
+    MockServerWebExchange read =
+        exchange(
+            MockServerHttpRequest.get("/api/analytics/dashboard")
+                .header("Authorization", "Bearer good-7"));
+    assertNull(forwarded(filter(AuthMode.ENFORCE), read));
+    assertEquals(HttpStatus.FORBIDDEN, read.getResponse().getStatusCode());
+  }
+
+  @Test
   void signedInButUnregisteredUserIsToldToFinishSetup() {
     MockServerWebExchange exchange =
         exchange(

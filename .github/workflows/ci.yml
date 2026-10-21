@@ -1,15 +1,15 @@
-name: JobGenie Development CI
+name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 jobs:
-  code-quality:
-    name: Code Quality & Security
+  secrets:
+    name: No committed secrets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -41,14 +41,6 @@ jobs:
       - name: Build and test backend
         working-directory: JobGenie-Backend
         run: mvn -B -Dspotless.skip=true package
-
-      - name: Upload backend artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jars
-          path: JobGenie-Backend/*/target/*.jar
-          retention-days: 7
-          if-no-files-found: warn
 
   ai-service:
     name: AI Service (Python/FastAPI)
@@ -93,6 +85,10 @@ jobs:
         working-directory: JobGenie-Frontend
         run: npm ci
 
+      - name: Type-check frontend
+        working-directory: JobGenie-Frontend
+        run: npm run typecheck
+
       - name: Test frontend
         working-directory: JobGenie-Frontend
         run: npm test
@@ -101,54 +97,15 @@ jobs:
         working-directory: JobGenie-Frontend
         run: npm run build
 
-      - name: Upload frontend build
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: JobGenie-Frontend/dist/
-          retention-days: 7
-
-  docker-build:
-    name: Docker Build & Security
+  compose:
+    name: Compose config
     runs-on: ubuntu-latest
-    needs: [backend, ai-service, frontend]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Validate Compose file
-        run: docker compose -f docker-compose.yml config --quiet
-
-  development-summary:
-    name: Development Summary
-    runs-on: ubuntu-latest
-    needs: [code-quality, backend, ai-service, frontend, docker-build]
-    if: always()
-    steps:
-      - name: Generate development report
         run: |
-          {
-            echo "JobGenie Development CI Report"
-            echo "Build: ${{ github.sha }}"
-            echo "Code quality: ${{ needs.code-quality.result }}"
-            echo "Backend: ${{ needs.backend.result }}"
-            echo "AI service: ${{ needs.ai-service.result }}"
-            echo "Frontend: ${{ needs.frontend.result }}"
-            echo "Docker: ${{ needs.docker-build.result }}"
-          } > ci-report.md
+          sed "s/^INTERNAL_AUTH_SECRET=.*/INTERNAL_AUTH_SECRET=ci-placeholder-secret-at-least-32-chars/" .env.example > .env
+          docker compose -f docker-compose.yml config --quiet
 
-      - name: Upload CI report
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-report
-          path: ci-report.md
-          retention-days: 7
-
-      - name: Fail if a required job failed
-        if: >-
-          needs.code-quality.result != 'success' ||
-          needs.backend.result != 'success' ||
-          needs.ai-service.result != 'success' ||
-          needs.frontend.result != 'success' ||
-          needs.docker-build.result != 'success'
-        run: exit 1

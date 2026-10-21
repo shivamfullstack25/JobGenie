@@ -5,7 +5,7 @@ import { API_BASE_URL } from '@/lib/queryClient';
 import { auth } from '@/firebase';
 
 export interface WebSocketMessage {
-  type: 'job_match' | 'application_update' | 'notification' | 'system_update' | 'ai_analysis_complete' | 
+  type: 'job_match' | 'analytics_update' | 'application_update' | 'notification' | 'system_update' | 'ai_analysis_complete' | 
         'real_time_match' | 'automation_progress' | 'market_update' | 'skill_recommendation' | 'live_analytics';
   data: any;
   timestamp: string;

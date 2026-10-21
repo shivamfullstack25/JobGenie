@@ -51,8 +51,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    volumes:
-      - maven-cache:/root/.m2/repository
     networks:
       - jobgenie-network
 
@@ -62,7 +60,7 @@ services:
       dockerfile: job-service/Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       USER_SERVICE_URL: http://user-service:8081
@@ -88,8 +86,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    volumes:
-      - maven-cache:/root/.m2/repository
     networks:
       - jobgenie-network
 
@@ -99,7 +95,7 @@ services:
       dockerfile: user-service/Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       RESUME_SERVICE_URL: http://resume-service:8083
@@ -111,14 +107,8 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
-      # Firebase Configuration
-      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
-      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
-      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
-      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
-      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
-      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
-      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID}
+      # Firebase: project id must match JobGenie-Frontend/src/firebase.ts
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-jobgenie-d95c7}
       FIREBASE_SERVICE_ACCOUNT_KEY: ${FIREBASE_SERVICE_ACCOUNT_KEY:-/app/secrets/firebase-service-account.json}
       SPRING_REDIS_HOST: ${REDIS_HOST:-redis}
       SPRING_REDIS_PORT: ${REDIS_PORT:-6379}
@@ -137,7 +127,6 @@ services:
       retries: 10
       start_period: 60s
     volumes:
-      - maven-cache:/root/.m2/repository
       - ./app/secrets:/app/secrets:ro
     networks:
       - jobgenie-network
@@ -148,7 +137,7 @@ services:
       dockerfile: resume-service/Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       SPRING_PROFILES_ACTIVE: docker
@@ -174,8 +163,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    volumes:
-      - maven-cache:/root/.m2/repository
     networks:
       - jobgenie-network
 
@@ -185,7 +172,7 @@ services:
       dockerfile: notification-service/Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       SPRING_PROFILES_ACTIVE: docker
@@ -209,8 +196,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    volumes:
-      - maven-cache:/root/.m2/repository
     networks:
       - jobgenie-network
 
@@ -220,7 +205,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       USER_SERVICE_URL: http://user-service:8081
@@ -284,10 +269,10 @@ services:
       dockerfile: api-gateway/Dockerfile
     restart: always
     environment:
-      # Identity enforcement (see ARCHITECTURE_MAP.md 7.2). Same secret in every service.
+      # Identity enforcement (see docs/architecture.md 7.2). Same secret in every service.
       AUTH_ENFORCEMENT: ${AUTH_ENFORCEMENT:-enforce}
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
-      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-jobgenie-d95c7}
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
       REDIS_HOST: ${REDIS_HOST:-redis}
@@ -317,8 +302,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    volumes:
-      - maven-cache:/root/.m2/repository
     networks:
       - jobgenie-network
 
@@ -347,7 +330,6 @@ services:
 
 volumes:
   pgdata:
-  maven-cache:
 
 networks:
   jobgenie-network:

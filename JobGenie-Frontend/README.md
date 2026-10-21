@@ -1,40 +1,16 @@
-# JobGenie-Frontend
+# JobGenie frontend
 
-This is the React + Tailwind CSS frontend for JobGenie.
+React 18 + Vite + TypeScript + Tailwind (shadcn/ui components). See the [root README](../README.md)
+to run the whole stack.
 
-## Setup
-
-1. Install dependencies:
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-2. Copy `.env.example` to `.env` and fill in your environment variables.
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-## Build
-
-To build for production:
 ```bash
-npm run build
-# or
-yarn build
+npm ci
+npm run dev        # http://localhost:3000; /api and /ws are proxied to the gateway on :8080
+npm test           # Vitest
+npm run build      # production build in dist/
 ```
 
-## Environment Variables
-See `.env.example` for required variables (API base URL, Firebase config, etc).
-
-## Docker
-To build and run with Docker:
-```bash
-docker build -t jobgenie-frontend .
-docker run -p 3000:3000 jobgenie-frontend
-``` 
+- Sign-in uses Firebase (config in `src/firebase.ts`). `src/lib/authFetch.ts` attaches the user's
+  ID token to every request to the JobGenie API, and to nothing else.
+- API clients live in `src/lib/api.ts`; pages in `src/pages/` are loaded on demand.
+- `VITE_API_BASE_URL` sets the gateway URL at build time (default `http://localhost:8080`).

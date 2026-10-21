@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -29,13 +28,14 @@ export default function AdminDashboard() {
       setLoading(true);
       try {
         // Replace with your actual backend/admin API endpoints
+        const json = (url: string) => apiRequest("GET", url).then((r) => r.json());
         const [users, resumes, jobsMatched, jobsApplied, health, errors] = await Promise.all([
-          apiRequest("GET", "/api/admin/users/count"),
-          apiRequest("GET", "/api/admin/resumes/count"),
-          apiRequest("GET", "/api/admin/jobs/matched/count"),
-          apiRequest("GET", "/api/admin/jobs/applied/count"),
-          apiRequest("GET", "/api/admin/health"),
-          apiRequest("GET", "/api/admin/errors/count"),
+          json("/api/admin/users/count"),
+          json("/api/admin/resumes/count"),
+          json("/api/admin/jobs/matched/count"),
+          json("/api/admin/jobs/applied/count"),
+          json("/api/admin/health"),
+          json("/api/admin/errors/count"),
         ]);
         setStats({
           totalUsers: users.count,
@@ -60,6 +60,7 @@ export default function AdminDashboard() {
       apiRequest("GET", "/api/users", {
         headers: { "X-User-Id": user.uid }
       })
+        .then((r) => r.json())
         .then(setUsers)
         .catch(() => setUsers([]))
         .finally(() => setUsersLoading(false));
