@@ -8,7 +8,7 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 pydantic>=2.5.0
-prometheus-fastapi-instrumentator>=6.1.0
+prometheus-fastapi-instrumentator>=8.1.0
 
 # LLM orchestration (resume analysis, cover letters, career chat) — degrades to rules without a key
 crewai>=0.1.0
