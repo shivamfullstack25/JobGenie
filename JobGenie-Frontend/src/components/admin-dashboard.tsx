@@ -57,9 +57,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAdmin && user) {
       setUsersLoading(true);
-      apiRequest("GET", "/api/users", {
-        headers: { "X-User-Id": user.uid }
-      })
+      apiRequest("GET", "/api/users")
         .then((r) => r.json())
         .then(setUsers)
         .catch(() => setUsers([]))
@@ -69,9 +67,7 @@ export default function AdminDashboard() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!user) return;
-    await apiRequest("PUT", `/api/users/${userId}/role?role=${newRole}`, {
-      headers: { "X-User-Id": user.uid }
-    });
+    await apiRequest("PUT", `/api/users/${userId}/role?role=${encodeURIComponent(newRole)}`);
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
   };
 

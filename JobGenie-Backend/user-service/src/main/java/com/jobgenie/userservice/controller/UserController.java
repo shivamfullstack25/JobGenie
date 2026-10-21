@@ -3,6 +3,7 @@ package com.jobgenie.userservice.controller;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.jobgenie.shared.entities.AuditLog;
 import com.jobgenie.shared.entities.User;
+import com.jobgenie.shared.security.CurrentUser;
 import com.jobgenie.userservice.dto.UserProfileUpdateRequest;
 import com.jobgenie.userservice.service.AccountService;
 import com.jobgenie.userservice.service.UserService;
@@ -95,29 +97,17 @@ public class UserController {
     return ResponseEntity.ok(user);
   }
 
-  /**
-   * Looks up the calling admin by X-User-Id and requires an admin role. X-User-Id carries the
-   * caller's Firebase UID here, not the numeric user-service ID — this previously called
-   * userService.getUserById(adminUserId), which does Long.valueOf(adminUserId) internally. The only
-   * real caller (admin-dashboard.tsx) sends the Firebase auth uid ("X-User-Id": user.uid) in this
-   * header, so every call hit IllegalArgumentException ("Invalid user ID format") and a 400 instead
-   * of ever reaching the admin check — the entire admin user-management UI (list users, change
-   * role, delete user) was unusable. getUserByFirebaseUid matches what's actually sent.
-   */
-  private void requireAdmin(String adminFirebaseUid) {
-    User user = userService.getUserByFirebaseUid(adminFirebaseUid);
-    if (user == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
-    }
-    if (!"admin".equals(user.getRole())) {
+  /** The caller's role comes from the gateway-signed principal, never from a request header. */
+  private static void requireAdmin(HttpServletRequest request) {
+    if (!CurrentUser.of(request).isAdmin()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
     }
   }
 
   @GetMapping
   @Operation(summary = "Get all users", description = "Retrieve all users (admin only)")
-  public ResponseEntity<List<User>> getAllUsers(@RequestHeader("X-User-Id") String adminUserId) {
-    requireAdmin(adminUserId);
+  public ResponseEntity<List<User>> getAllUsers(HttpServletRequest request) {
+    requireAdmin(request);
     List<User> users = userService.getAllUsers();
     return ResponseEntity.ok(users);
   }
@@ -125,8 +115,8 @@ public class UserController {
   @DeleteMapping("/{userId}")
   @Operation(summary = "Delete user", description = "Delete a user account (admin only)")
   public ResponseEntity<Map<String, String>> deleteUser(
-      @PathVariable String userId, @RequestHeader("X-User-Id") String adminUserId) {
-    requireAdmin(adminUserId);
+      @PathVariable String userId, HttpServletRequest request) {
+    requireAdmin(request);
     userService.deleteUser(userId);
     return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
   }
@@ -151,16 +141,13 @@ public class UserController {
   public ResponseEntity<User> updateUserRole(
       @PathVariable String userId,
       @RequestParam String role,
-      @RequestHeader("X-User-Id") String adminUserId) {
-
-    log.info("Admin {} updating role for user {} to {}", adminUserId, userId, role);
-
-    // Reuse the same requireAdmin helper as the other admin-only endpoints (GET /api/users,
-    // DELETE /api/users/{userId}) instead of the ad hoc getUserByFirebaseUid + manual 403 that
-    // used to live here — this previously duplicated (and, before requireAdmin's own fix,
-    // mismatched) the admin check. Let ResponseStatusException/UserNotFoundException propagate
-    // to GlobalExceptionHandler instead of collapsing every failure into a bare 500.
-    requireAdmin(adminUserId);
+      HttpServletRequest request) {
+    requireAdmin(request);
+    log.info(
+        "Admin {} updating role for user {} to {}",
+        CurrentUser.of(request).getUserId(),
+        userId,
+        role);
 
     User updatedUser = userService.updateUserRole(userId, role);
     log.info("Successfully updated user {} role to {}", userId, role);
