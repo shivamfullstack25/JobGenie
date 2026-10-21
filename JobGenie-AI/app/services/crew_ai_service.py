@@ -8,13 +8,6 @@ try:
     from crewai import LLM as CrewLLM
 except ImportError:
     CrewLLM = None  # type: ignore
-try:
-    from langchain_core.tools import Tool
-except ImportError:
-    try:
-        from langchain.tools import Tool
-    except ImportError:
-        Tool = None  # type: ignore
 from typing import Dict, List, Any, Optional
 
 from app.agents.lexicon import SKILL_KEYWORDS

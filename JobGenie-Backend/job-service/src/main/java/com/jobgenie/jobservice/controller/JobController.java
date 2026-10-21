@@ -289,51 +289,6 @@ public class JobController {
     }
   }
 
-  @PostMapping("/automation/start")
-  @Operation(
-      summary = "Start job automation",
-      description = "Start automated job search and application process")
-  public ResponseEntity<Map<String, Object>> startAutomation(
-      @RequestBody Map<String, Object> config, HttpServletRequest request) {
-    log.info("Starting job automation");
-    if (!CurrentUser.canActFor(request, config.get("userId"))) {
-      return ResponseEntity.status(HttpStatus.FORBIDDEN)
-          .body(Map.of("error", "You can only manage your own automation"));
-    }
-    try {
-      // Extract config parameters
-      String userId = (String) config.get("userId");
-
-      if (userId != null && !isEmailVerified(userId)) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(Map.of("error", "Please verify your email to use this feature"));
-      }
-
-      // Start automation using the job service
-      Map<String, Object> result = jobService.startAutomation(userId, config);
-
-      return ResponseEntity.ok(result);
-    } catch (Exception e) {
-      log.error("Error starting automation: {}", e.getMessage(), e);
-      return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
-    }
-  }
-
-  @GetMapping("/automation/status")
-  @Operation(
-      summary = "Get automation status",
-      description = "Get current status of job automation for a user")
-  public ResponseEntity<Map<String, Object>> getAutomationStatus(@RequestParam String userId) {
-    log.info("Getting automation status for user: {}", userId);
-    try {
-      Map<String, Object> status = jobService.getAutomationStatus(userId);
-      return ResponseEntity.ok(status);
-    } catch (Exception e) {
-      log.error("Error getting automation status: {}", e.getMessage(), e);
-      return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
-    }
-  }
-
   @GetMapping("/matches/count")
   @Operation(summary = "Get job matches count", description = "Get the total number of job matches")
   public ResponseEntity<Map<String, Object>> getJobMatchesCount() {

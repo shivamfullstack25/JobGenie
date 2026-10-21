@@ -9,7 +9,9 @@
 | 1A Safety net | Authentication enforced end to end, AI code tracked, test harnesses and CI in place. **Open:** Flyway baseline, characterization tests. See `docs/migration-notes/phase-1a.md`. |
 | 1B Profile, versions, resume | CandidateProfile + provenance + versions + rollback + YAML + resume-fill + ResumeAgent tailoring done. **Open:** ResumeVersion storage, async parse, `LLMProvider`. |
 | 2 Job intelligence | NormalizedJob, Greenhouse/Lever/Ashby adapters, dedup, safety, hybrid matching, policy + kill switches, Discover page done. **Open:** Adzuna adapter + attribution, scraper removal, embeddings provider. |
-| 3-7 | Not started. |
+| 3 Application intelligence | Answer policy, decision agent, application packages (resume + cover letter + answers + recruiter message) done. |
+| 4 Approval + tracking | Approval Center, 15-state lifecycle with append-only transition log done. **Open:** interview/offer records, notifications on transitions, kill-switch control on the dashboard. |
+| 5-7 | Not started. |
 
 Nothing above has yet been verified against the running Docker stack; see `docs/migration-notes/phase-1b-and-2.md`.
 

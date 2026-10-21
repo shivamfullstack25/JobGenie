@@ -1,6 +1,6 @@
 import {useMemo, useState} from "react";
 import {useMutation, useQuery} from "@tanstack/react-query";
-import {Link} from "wouter";
+import {Link, useLocation} from "wouter";
 import Navigation from "@/components/navigation";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
@@ -9,9 +9,18 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {useAuth} from "@/context/AuthContext";
 import {useToast} from "@/hooks/use-toast";
-import {discoveryAPI, jobAPI, profileAPI, type DiscoveredJob} from "@/lib/api";
+import {applicationAPI, discoveryAPI, jobAPI, profileAPI, type DiscoveredJob} from "@/lib/api";
 
 const STORAGE_KEY = "jobgenie-discovery-form";
+
+const DEFAULT_QUESTIONS = [
+  "What is your notice period?",
+  "What are your salary expectations?",
+  "Are you authorized to work in this country?",
+  "Will you now or in the future require visa sponsorship?",
+  "Total years of professional experience?",
+  "Are you willing to relocate?",
+].join("\n");
 
 function loadForm() {
   try {
@@ -54,6 +63,9 @@ export default function JobDiscovery() {
   const [useProfile, setUseProfile] = useState<boolean>(saved.useProfile ?? true);
   const [done, setDone] = useState<Record<string, "saved" | "applied">>({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<string>(saved.questions ?? DEFAULT_QUESTIONS);
+  const [preparing, setPreparing] = useState<string | null>(null);
+  const [, navigate] = useLocation();
   const userId = backendUser?.id;
 
   const profile = useQuery({
@@ -76,7 +88,7 @@ export default function JobDiscovery() {
   const search = useMutation({
     mutationFn: () => {
       const boardList = boards.split(",").map((b) => b.trim()).filter(Boolean);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ keywords, location, boards, useProfile }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ keywords, location, boards, useProfile, questions }));
       return discoveryAPI.discover({
         keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
         location,
@@ -98,6 +110,37 @@ export default function JobDiscovery() {
       toast({ title: "Saved", description: `${entry.job.title} at ${entry.job.company}` });
     } catch (e) {
       toast({ title: "Could not save", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    }
+  };
+
+  const prepare = async (entry: DiscoveredJob) => {
+    const provenance: Record<string, string> = {};
+    Object.entries(profile.data?.facts ?? {}).forEach(([field, fact]) => {
+      if (fact.provenance && field in profileValues) provenance[field] = fact.provenance;
+    });
+    setPreparing(entry.job.job_id);
+    try {
+      const pkg = await applicationAPI.buildPackage({
+        profile: profileValues,
+        job: entry.job,
+        questions: questions.split("\n").map((q) => q.trim()).filter(Boolean),
+        provenance,
+      });
+      if (pkg.decision === "DO_NOT_APPLY" || pkg.decision === "MISSING_INFORMATION") {
+        toast({
+          title: pkg.decision === "DO_NOT_APPLY" ? "JobGenie advises against this one" : "Your profile needs more first",
+          description: pkg.decision_reasons[0],
+          variant: "destructive",
+        });
+        return;
+      }
+      await applicationAPI.queue(userId!, pkg);
+      toast({ title: "Ready for your review", description: "Open the Approval Center to review, edit and approve." });
+      navigate("/approvals");
+    } catch (e) {
+      toast({ title: "Could not prepare the application", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    } finally {
+      setPreparing(null);
     }
   };
 
@@ -148,6 +191,17 @@ export default function JobDiscovery() {
                 (e.g. <code>boards.greenhouse.io/<b>stripe</b></code>). Supported: greenhouse, lever, ashby.
               </p>
             </div>
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">Screening questions JobGenie should answer from your profile</summary>
+              <textarea
+                className="mt-2 w-full rounded-md border bg-background p-2 text-sm"
+                rows={5}
+                value={questions}
+                onChange={(e) => setQuestions(e.target.value)}
+                aria-label="Screening questions, one per line"
+              />
+              <p className="text-xs text-muted-foreground">One per line. Anything your profile can't answer is left for you; nothing is guessed.</p>
+            </details>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={useProfile} onChange={(e) => setUseProfile(e.target.checked)} />
@@ -222,7 +276,13 @@ export default function JobDiscovery() {
                     )}
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button size="sm" onClick={() => openAndLog(entry)} disabled={state === "applied"} variant={safety.level === "HIGH" ? "outline" : "default"}>
+                      {safety.level !== "HIGH" && (
+                        <Button size="sm" onClick={() => prepare(entry)} disabled={preparing === job.job_id || Object.keys(profileValues).length === 0}
+                          title={Object.keys(profileValues).length === 0 ? "Fill in your profile first" : undefined}>
+                          {preparing === job.job_id ? "Preparing…" : "Prepare application"}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => openAndLog(entry)} disabled={state === "applied"}>
                         {state === "applied" ? "Logged as applied" : safety.level === "HIGH" ? "Open anyway & log" : "Apply on site & log"}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => save(entry)} disabled={!!state}>

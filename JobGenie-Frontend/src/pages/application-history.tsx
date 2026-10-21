@@ -20,27 +20,57 @@ import {Link} from "wouter";
 // validates against exactly these, case-insensitive, normalized to uppercase server-side).
 // Each gets a distinct badge treatment so the history list reads at a glance.
 const APPLICATION_STATUSES = [
-  "APPLIED",
-  "INTERVIEWING",
+  "SHORTLISTED",
+  "PREPARING",
+  "AWAITING_APPROVAL",
+  "READY_TO_SUBMIT",
+  "SUBMITTED",
+  "SCREENING",
+  "INTERVIEW",
+  "TECHNICAL_ROUND",
+  "HR_ROUND",
   "OFFER",
   "REJECTED",
   "WITHDRAWN",
+  "CLOSED",
 ] as const;
 
+// Older rows use APPLIED / INTERVIEWING; they are the same states as SUBMITTED / INTERVIEW.
+const ALIASES: Record<string, string> = { APPLIED: "SUBMITTED", INTERVIEWING: "INTERVIEW" };
+const canonicalStatus = (status: string) => ALIASES[status?.toUpperCase()] ?? status?.toUpperCase();
+
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  APPLIED: "bg-gray-100 text-gray-800 border-gray-200",
-  INTERVIEWING: "bg-blue-100 text-blue-800 border-blue-200",
+  SHORTLISTED: "bg-gray-100 text-gray-800 border-gray-200",
+  PREPARING: "bg-gray-100 text-gray-800 border-gray-200",
+  AWAITING_APPROVAL: "bg-amber-100 text-amber-800 border-amber-200",
+  READY_TO_SUBMIT: "bg-amber-100 text-amber-800 border-amber-200",
+  SUBMITTED: "bg-blue-50 text-blue-800 border-blue-200",
+  SCREENING: "bg-blue-100 text-blue-800 border-blue-200",
+  INTERVIEW: "bg-blue-100 text-blue-800 border-blue-200",
+  TECHNICAL_ROUND: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  HR_ROUND: "bg-indigo-100 text-indigo-800 border-indigo-200",
   OFFER: "bg-green-100 text-green-800 border-green-200",
   REJECTED: "bg-red-100 text-red-800 border-red-200",
   WITHDRAWN: "bg-gray-100 text-gray-500 border-gray-200",
+  CLOSED: "bg-gray-100 text-gray-500 border-gray-200",
+  ERROR: "bg-red-100 text-red-800 border-red-200",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  APPLIED: "Applied",
-  INTERVIEWING: "Interviewing",
+  SHORTLISTED: "Shortlisted",
+  PREPARING: "Preparing",
+  AWAITING_APPROVAL: "Awaiting approval",
+  READY_TO_SUBMIT: "Ready to submit",
+  SUBMITTED: "Applied",
+  SCREENING: "Screening",
+  INTERVIEW: "Interview",
+  TECHNICAL_ROUND: "Technical round",
+  HR_ROUND: "HR round",
   OFFER: "Offer",
   REJECTED: "Rejected",
   WITHDRAWN: "Withdrawn",
+  CLOSED: "Closed",
+  ERROR: "Error",
 };
 
 export default function ApplicationHistory() {
@@ -128,7 +158,7 @@ export default function ApplicationHistory() {
               <p className="text-gray-500">No applications yet.</p>
             ) : (
               applications.map((app: any) => {
-                const currentStatus = (app.status || "APPLIED").toUpperCase();
+                const currentStatus = canonicalStatus(app.status || "APPLIED");
                 const isUpdating =
                   updateStatusMutation.isPending &&
                   updateStatusMutation.variables?.applicationId === app.id;
@@ -147,7 +177,7 @@ export default function ApplicationHistory() {
                       <Badge
                         className={
                           STATUS_BADGE_CLASSES[currentStatus] ||
-                          STATUS_BADGE_CLASSES.APPLIED
+                          STATUS_BADGE_CLASSES.SUBMITTED
                         }
                       >
                         {STATUS_LABELS[currentStatus] || currentStatus}

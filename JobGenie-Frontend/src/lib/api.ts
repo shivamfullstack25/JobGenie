@@ -1,7 +1,5 @@
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:8080";
-const AI_SERVICE_URL =
-  (import.meta as any).env?.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
 
 export interface ResumeUploadResponse {
   success: boolean;
@@ -10,33 +8,6 @@ export interface ResumeUploadResponse {
   resume?: any;
   metadata?: any;
   insights?: any;
-}
-
-export interface JobSearchRequest {
-  user_skills: string[];
-  preferred_locations: string[];
-  job_titles: string[];
-  experience_level?: string;
-  remote_preference?: string;
-}
-
-export interface CoverLetterRequest {
-  job_title: string;
-  company: string;
-  user_skills: string[];
-  resume_summary?: string;
-  tone?: string;
-}
-
-export interface ATSOptimizationRequest {
-  resume_content: string;
-  job_description: string;
-  target_score?: number;
-}
-
-export interface CareerAdviceRequest {
-  question: string;
-  user_context?: any;
 }
 
 // Resume Service APIs
@@ -88,229 +59,6 @@ export const resumeAPI = {
   getResumeContent: async (resumeId: number) => {
     const response = await fetch(`${API_BASE_URL}/api/resumes/${resumeId}/content`);
     return response.text();
-  },
-};
-
-// AI Service APIs - Updated to use backend endpoints
-export const aiAPI = {
-  analyzeResume: async (resumeText: string, detailed: boolean = false, jobDescription?: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/resumes/insights`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        resume_text: resumeText,
-        detailed,
-        job_description: jobDescription,
-      }),
-    });
-
-    return response.json();
-  },
-
-  generateCoverLetter: async (request: CoverLetterRequest) => {
-    const response = await fetch(`${API_BASE_URL}/api/resumes/generate-cover-letter`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        job_title: request.job_title,
-        company_name: request.company,
-        resume_content: request.resume_summary || '',
-        personal_statement: request.tone || 'professional',
-      }),
-    });
-
-    return response.json();
-  },
-
-  optimizeForATS: async (request: ATSOptimizationRequest) => {
-    const response = await fetch(`${API_BASE_URL}/api/resumes/optimize-ats`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        resume_content: request.resume_content,
-        job_description: request.job_description,
-        target_score: request.target_score || 80,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getCareerAdvice: async (request: CareerAdviceRequest) => {
-    const response = await fetch(`${API_BASE_URL}/api/resumes/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        question: request.question,
-        user_context: request.user_context,
-      }),
-    });
-
-    return response.json();
-  },
-
-  searchJobs: async (request: JobSearchRequest) => {
-    const response = await fetch(`${API_BASE_URL}/api/jobs/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        keywords: request.job_titles,
-        location: request.preferred_locations.join(', '),
-        max_jobs: 20,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getJobMatches: async (userId: string, resumeId?: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/jobs/matches?userId=${userId}${resumeId ? `&resumeId=${resumeId}` : ''}`);
-    return response.json();
-  },
-
-  getUserApplications: async (userId: string, page: number = 1, size: number = 10) => {
-    const response = await fetch(`${API_BASE_URL}/api/jobs/applications?userId=${userId}&page=${page}&size=${size}`);
-    return response.json();
-  },
-
-  setupScheduler: async (userId: string, scheduleType: string, searchCriteria: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/automation/schedule-advanced`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        frequency: scheduleType,
-        platforms: ['linkedin', 'indeed', 'naukri'],
-        jobPreferences: searchCriteria,
-        autoApplyEnabled: false,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getSchedulerStatus: async (userId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/automation/status?userId=${userId}`);
-    return response.json();
-  },
-
-  deleteScheduler: async (schedulerId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${schedulerId}`, {
-      method: 'DELETE',
-    });
-    return response.json();
-  },
-
-  // Schedule Management
-  createJobSearchSchedule: async (userId: string, scheduleConfig: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedule/job-search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        ...scheduleConfig,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getUserSchedules: async (userId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedules?userId=${userId}`);
-    return response.json();
-  },
-
-  pauseSchedule: async (scheduleId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}/toggle`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ isActive: false }),
-    });
-
-    return response.json();
-  },
-
-  resumeSchedule: async (scheduleId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}/toggle`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ isActive: true }),
-    });
-
-    return response.json();
-  },
-
-  // Notification Management
-  sendNotification: async (userId: string, notificationType: string, data: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/notifications/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        notification_type: notificationType,
-        data: data,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getNotificationHistory: async (userId: string, limit: number = 50) => {
-    const response = await fetch(`${API_BASE_URL}/api/notifications/history/${userId}?limit=${limit}`);
-    return response.json();
-  },
-
-  markNotificationAsRead: async (userId: string, notificationId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}/read?user_id=${userId}`, {
-      method: 'POST',
-    });
-
-    return response.json();
-  },
-
-  getNotificationStats: async (userId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/notifications/stats/${userId}`);
-    return response.json();
-  },
-
-  executeCrewTask: async (taskType: string, taskData: any) => {
-    const response = await fetch(`${API_BASE_URL}/ai/crew/execute`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        task_type: taskType,
-        task_data: taskData,
-      }),
-    });
-
-    return response.json();
-  },
-
-  getCrewStatus: async () => {
-    const response = await fetch(`${API_BASE_URL}/ai/crew/status`);
-    return response.json();
   },
 };
 
@@ -467,24 +215,7 @@ export const jobAPI = {
     return response.json();
   },
 
-  startAutomation: async (userId: string, config: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/jobs/automation/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(config),
-    });
-    return response.json();
-  },
 
-  getAutomationStatus: async (userId: string) => {
-    const params = new URLSearchParams();
-    params.append('userId', userId);
-
-    const response = await fetch(`${API_BASE_URL}/api/jobs/automation/status?${params}`);
-    return response.json();
-  },
 };
 
 // Candidate Profile APIs (user-service). The profile is the canonical record of the candidate:
@@ -682,54 +413,76 @@ export const discoveryAPI = {
   },
 };
 
-// User Service APIs
-export const userAPI = {
-  createUser: async (userData: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
+// Application packages + the Approval Center. A package is built by the AI service from the
+// user's own profile and is only ever a proposal; it waits in the approval queue (job-service) until
+// the user approves, edits, saves or rejects it. JobGenie never submits: approving makes the
+// application READY_TO_SUBMIT and the user applies on the employer's site.
+export interface ApplicationAnswer {
+  question: string; topic: string; answer: unknown; source: string | null; confidence: number;
+  requires_approval: boolean; status: 'FILLED' | 'USER_INPUT_REQUIRED' | 'DRAFT_ONLY'; note?: string | null; evidence?: string[] | null;
+}
 
-    return response.json();
-  },
+export interface ApplicationPackage {
+  job: { job_id: string; title: string; company: string; location: string; source: string };
+  decision: string;
+  decision_reasons: string[];
+  preset: { preset: string; reason: string };
+  resume: { text: string };
+  cover_letter: { text: string; unsupported_claims: string[] };
+  recruiter_message: string;
+  answers: ApplicationAnswer[];
+  checks: { name: string; passed: boolean; detail: string }[];
+  needs_confirmation: string[];
+  missing_information: string[];
+  submission: { method: string; url: string; platform_mode: string };
+  suggested_state: string;
+  match: { match_score: number } | null;
+  safety: { level: string; reasons: string[] };
+}
 
-  getUser: async (userId: number) => {
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`);
-    return response.json();
-  },
+export interface ApprovalRequestRow {
+  id: number; userId: string; jobId: string; jobTitle: string; company: string; location: string; source: string;
+  applicationUrl: string; decision: string; matchScore: number | null; riskLevel: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SAVED'; packageData: ApplicationPackage; editedByUser: boolean;
+  applicationId: number | null; note: string | null; createdAt: string; decidedAt: string | null;
+}
 
-  updateUser: async (userId: number, userData: any) => {
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
+async function jsonOrThrow<T>(response: Response, fallback: string): Promise<T> {
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.message ?? parsed.detail ?? text;
+    } catch {
+      // not JSON
+    }
+    throw new Error(message || `${fallback} (${response.status})`);
+  }
+  return response.json();
+}
 
-    return response.json();
-  },
-
-  deleteUser: async (userId: number) => {
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-      method: 'DELETE',
-    });
-    return response.ok;
-  },
+export const applicationAPI = {
+  buildPackage: async (body: {
+    profile: Record<string, unknown>; job: unknown; questions: string[]; provenance?: Record<string, string>; applied_job_ids?: string[];
+  }): Promise<ApplicationPackage> =>
+    jsonOrThrow(await fetch(`${API_BASE_URL}/ai/v2/applications/package`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }), 'Could not prepare the application'),
+  queue: async (userId: string | number, pkg: ApplicationPackage): Promise<ApprovalRequestRow> =>
+    jsonOrThrow(await fetch(`${API_BASE_URL}/api/approvals?userId=${userId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pkg),
+    }), 'Could not queue the package'),
+  list: async (userId: string | number): Promise<ApprovalRequestRow[]> =>
+    jsonOrThrow(await fetch(`${API_BASE_URL}/api/approvals?userId=${userId}`), 'Could not load the approval queue'),
+  decide: async (
+    userId: string | number, id: number, action: 'APPROVE' | 'EDIT' | 'SAVE' | 'REJECT',
+    edits?: { coverLetterText?: string; recruiterMessage?: string; answers?: { question: string; answer: string }[] }, note?: string,
+  ): Promise<ApprovalRequestRow> =>
+    jsonOrThrow(await fetch(`${API_BASE_URL}/api/approvals/${id}/decision?userId=${userId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, edits, note }),
+    }), 'Could not record your decision'),
+  history: async (userId: string | number, applicationId: number): Promise<{ id: number; fromState: string | null; toState: string; actor: string; reason: string | null; createdAt: string }[]> =>
+    jsonOrThrow(await fetch(`${API_BASE_URL}/api/approvals/applications/${applicationId}/history?userId=${userId}`), 'Could not load history'),
 };
 
-// Health check
-export const healthAPI = {
-  checkSpringBoot: async () => {
-    const response = await fetch(`${API_BASE_URL}/actuator/health`);
-    return response.json();
-  },
-
-  checkAIService: async () => {
-    const response = await fetch(`${AI_SERVICE_URL}/health`);
-    return response.json();
-  },
-}; 

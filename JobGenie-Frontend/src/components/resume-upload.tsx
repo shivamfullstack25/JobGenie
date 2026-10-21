@@ -7,7 +7,7 @@ import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
 import {useAuth} from "@/context/AuthContext";
 import jsPDF from 'jspdf';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function ResumeUpload() {
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -152,9 +152,11 @@ export default function ResumeUpload() {
         )}
         {uploadMutation.isPending && <p className="text-sm text-gray-500">Uploading and parsing...</p>}
 
-        <Dialog open={reviewOpen} onClose={() => setReviewOpen(false)} maxWidth="md" fullWidth>
-          <DialogTitle>Review Parsed Resume Data</DialogTitle>
-          <DialogContent>
+        <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Review Parsed Resume Data</DialogTitle>
+            </DialogHeader>
             <div className="space-y-3 mt-2">
               <label className="block text-sm font-medium">Skills (comma-separated)</label>
               <input
@@ -175,12 +177,12 @@ export default function ResumeUpload() {
                 onChange={(e) => handleReviewFieldChange("summary", e.target.value)}
               />
             </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={downloadInsights}>Download Insights</Button>
+              <Button variant="outline" onClick={exportPdf}>Export PDF</Button>
+              <Button onClick={handleConfirmParsedData}>Confirm & Save</Button>
+            </DialogFooter>
           </DialogContent>
-          <DialogActions>
-            <Button variant="outline" onClick={downloadInsights}>Download Insights</Button>
-            <Button variant="outline" onClick={exportPdf}>Export PDF</Button>
-            <Button onClick={handleConfirmParsedData}>Confirm & Save</Button>
-          </DialogActions>
         </Dialog>
       </CardContent>
     </Card>

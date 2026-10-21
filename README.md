@@ -315,7 +315,6 @@ JobGenie/
 │   │   └── utils/                # Helper functions and rate limiting
 │   ├── main.py                   # FastAPI application with health checks
 │   ├── requirements.txt          # Python dependencies (enhanced)
-│   ├── startup.sh                # AI service startup script
 │   └── Dockerfile                # Production Docker image
 ├── ⚛️  JobGenie-Frontend/          # React TypeScript frontend + Enhanced WebSocket
 │   ├── src/

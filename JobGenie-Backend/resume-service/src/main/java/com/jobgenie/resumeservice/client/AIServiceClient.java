@@ -137,23 +137,4 @@ public class AIServiceClient {
       throw new RuntimeException("AI service call failed", e);
     }
   }
-
-  public Map<String, Object> analyzeResume(String resumeText) {
-    try {
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.APPLICATION_JSON);
-
-      Map<String, Object> request = Map.of("resume_text", resumeText);
-
-      HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
-
-      ResponseEntity<Map> response =
-          restTemplate.postForEntity(aiServiceUrl + "/api/resume-insights", entity, Map.class);
-
-      return response.getBody();
-    } catch (Exception e) {
-      log.error("Error calling AI service for resume analysis: {}", e.getMessage());
-      throw new RuntimeException("AI service call failed", e);
-    }
-  }
 }

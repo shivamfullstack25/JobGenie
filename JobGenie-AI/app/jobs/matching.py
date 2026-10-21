@@ -40,32 +40,55 @@ def _has(text: str, term: str) -> bool:
     return bool(re.search(r"(?<![a-z0-9])" + re.escape(term.lower()) + r"(?![a-z0-9])", text.lower()))
 
 
-def profile_years(profile: Dict[str, Any]) -> Optional[float]:
-    """Total years across roles, from the start/end years the candidate gave. None if undeterminable."""
+_MONTHS = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
+
+
+def _month_index(text: str, default_month: int) -> Optional[int]:
+    """'Nov 2020' / '2020-11' / '2020' -> months since year 0. A bare year uses ``default_month``."""
+    text = str(text or "").strip().lower()
+    year = re.search(r"(?:19|20)\d{2}", text)
+    if not year:
+        return None
+    month = default_month
+    named = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", text)
+    numeric = re.search(r"(?:19|20)\d{2}[-/](\d{1,2})|(\d{1,2})[-/](?:19|20)\d{2}", text)
+    if named:
+        month = _MONTHS[named.group(1)]
+    elif numeric:
+        month = int(numeric.group(1) or numeric.group(2))
+    return int(year.group()) * 12 + max(1, min(12, month))
+
+
+def profile_years(profile: Dict[str, Any], today=None) -> Optional[float]:
+    """Total working time across roles, to the month, from the dates the candidate gave. Overlapping
+    roles are counted once. 'Present' means today, and no role is counted past today. None if no
+    role has a usable start date."""
     from datetime import date
 
+    today = today or date.today()
+    now = today.year * 12 + today.month
     spans = []
     for entry in profile.get("experience") or []:
         if not isinstance(entry, dict):
             continue
-        start = re.search(r"(?:19|20)\d{2}", str(entry.get("start") or ""))
+        start = _month_index(entry.get("start"), 1)
         end_text = str(entry.get("end") or "").strip().lower()
-        end = re.search(r"(?:19|20)\d{2}", end_text)
-        if not start:
+        end = now if end_text in ("", "present", "current", "now", "ongoing") else _month_index(end_text, 12)
+        if start is None or end is None:
             continue
-        end_year = int(end.group()) if end else (date.today().year if end_text in ("", "present", "current", "now", "ongoing") else None)
-        if end_year is not None and end_year >= int(start.group()):
-            spans.append((int(start.group()), end_year))
+        end = min(end, now)
+        if end >= start:
+            spans.append((start, end))
     if not spans:
         return None
     spans.sort()
     merged = [list(spans[0])]
-    for start, end in spans[1:]:  # overlapping roles are not counted twice
-        if start <= merged[-1][1]:
+    for start, end in spans[1:]:
+        if start <= merged[-1][1] + 1:  # overlapping or back to back
             merged[-1][1] = max(merged[-1][1], end)
         else:
             merged.append([start, end])
-    return float(sum(e - s for s, e in merged))
+    return sum(e - s + 1 for s, e in merged) / 12.0
 
 
 # ------------------------------------------------------------------------------------- factors

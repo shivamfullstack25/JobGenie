@@ -172,67 +172,35 @@ public class ScheduleController {
   @GetMapping("/{scheduleId}")
   @Operation(summary = "Get schedule", description = "Get details of a specific schedule")
   @SuppressWarnings("unchecked")
-  public ResponseEntity<Map<String, Object>> getSchedule(@PathVariable String scheduleId, HttpServletRequest httpRequest) {
+  public ResponseEntity<Map<String, Object>> getSchedule(
+      @PathVariable String scheduleId, HttpServletRequest httpRequest) {
     if (!ownsSchedule(httpRequest, scheduleId)) {
       return forbidden();
     }
-    try {
-      log.info("Getting schedule: {}", scheduleId);
-
-      // Try to get the specific schedule from AI service
-      try {
-        Map<String, Object> response =
-            restTemplate.getForObject(
-                aiServiceUrl + "/api/scheduler/" + scheduleId + "/status", Map.class);
-
-        if (response != null) {
-          // Transform AI service response to expected frontend format
-          Map<String, Object> schedule = new HashMap<>();
-          schedule.put("id", scheduleId);
-          schedule.put("frequency", response.getOrDefault("frequency", "daily"));
-          schedule.put("status", response.getOrDefault("status", "active"));
-          schedule.put("nextRun", response.get("next_execution"));
-          schedule.put("lastRun", response.get("last_execution"));
-          schedule.put(
-              "platforms", response.getOrDefault("platforms", List.of("linkedin", "indeed")));
-          schedule.put(
-              "jobPreferences",
-              response.getOrDefault(
-                  "search_criteria",
-                  Map.of(
-                      "keywords", List.of(), "location", "", "salaryMin", 0, "salaryMax", 200000)));
-
-          return ResponseEntity.ok(schedule);
-        }
-      } catch (Exception aiServiceException) {
-        log.warn(
-            "AI service call failed, falling back to default schedule: {}",
-            aiServiceException.getMessage());
-      }
-
-      // Fallback: return a basic schedule structure if AI service is unavailable
-      Map<String, Object> schedule =
-          Map.of(
-              "id",
-              scheduleId,
-              "frequency",
-              "daily",
-              "status",
-              "unknown",
-              "nextRun",
-              LocalDateTime.now().plusDays(1).toString(),
-              "lastRun",
-              null,
-              "platforms",
-              List.of("linkedin", "indeed"),
-              "jobPreferences",
-              Map.of("keywords", List.of(), "location", "", "salaryMin", 0, "salaryMax", 200000));
-
-      return ResponseEntity.ok(schedule);
-
-    } catch (Exception e) {
-      log.error("Error getting schedule: {}", e.getMessage(), e);
+    // Schedule ids are schedule_<userId>_<timestamp>; the AI service lists schedules per user.
+    // (This used to call an AI endpoint that never existed and, on the inevitable failure,
+    // returned an invented "daily / linkedin, indeed" schedule.)
+    String[] parts = scheduleId.split("_");
+    if (parts.length < 3) {
       return ResponseEntity.status(404).body(Map.of("error", "Schedule not found"));
+    }
+    try {
+      Map<String, Object> response =
+          restTemplate.getForObject(aiServiceUrl + "/api/schedule/user/" + parts[1], Map.class);
+      List<Map<String, Object>> schedules =
+          (List<Map<String, Object>>)
+              (response != null ? response.getOrDefault("schedules", List.of()) : List.of());
+      for (Map<String, Object> schedule : schedules) {
+        if (scheduleId.equals(schedule.get("schedule_id"))) {
+          Map<String, Object> result = new HashMap<>(schedule);
+          transformScheduleToFrontendFormat(result);
+          return ResponseEntity.ok(result);
+        }
+      }
+      return ResponseEntity.status(404).body(Map.of("error", "Schedule not found"));
+    } catch (Exception e) {
+      log.error("Error getting schedule {}: {}", scheduleId, e.getMessage());
+      return ResponseEntity.status(502).body(Map.of("error", "Schedules are unavailable right now"));
     }
   }
 

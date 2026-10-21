@@ -99,20 +99,7 @@ async def shutdown_event():
     
     logger.info("JobGenie AI Service shutdown complete")
 
-# Core services — prefer real implementations; fall back so /health still serves
-resume_parser = _safe_import(
-    "resume_parser", lambda: __import__("app.services.resume_parser", fromlist=["ResumeParser"]).ResumeParser()
-)
-cover_letter_generator = _safe_import(
-    "cover_letter_generator",
-    lambda: __import__("app.services.cover_letter_generator", fromlist=["CoverLetterGenerator"]).CoverLetterGenerator(),
-)
-ats_optimizer = _safe_import(
-    "ats_optimizer", lambda: __import__("app.services.ats_optimizer", fromlist=["ATSOptimizer"]).ATSOptimizer()
-)
-career_mentor = _safe_import(
-    "career_mentor", lambda: __import__("app.services.career_mentor", fromlist=["CareerMentor"]).CareerMentor()
-)
+# Core services — degrade gracefully so /health still serves
 job_aggregator = _safe_import(
     "job_aggregator", lambda: __import__("app.services.job_aggregator", fromlist=["JobAggregator"]).JobAggregator()
 )
@@ -127,14 +114,6 @@ scheduler_agent = _safe_import(
 notification_service = _safe_import(
     "notification",
     lambda: __import__("app.services.notification_service", fromlist=["NotificationService"]).NotificationService(),
-)
-market_intelligence = _safe_import(
-    "market_intelligence",
-    lambda: __import__("app.services.market_intelligence", fromlist=["MarketIntelligence"]).MarketIntelligence(),
-)
-enhanced_job_matcher = _safe_import(
-    "enhanced_job_matcher",
-    lambda: __import__("app.services.enhanced_job_matcher", fromlist=["EnhancedJobMatcher"]).EnhancedJobMatcher(),
 )
 
 
@@ -154,9 +133,6 @@ class JobSearchRequest(BaseModel):
     max_jobs: int = 20
     platforms: Optional[List[str]] = None
 
-class JobMatchRequest(BaseModel):
-    resume_skills: List[str]
-    job_requirements: List[str]
 
 class CoverLetterRequest(BaseModel):
     job_title: str
@@ -176,16 +152,7 @@ class CareerAdviceRequest(BaseModel):
     career_goals: str
     skills: List[str]
 
-class SchedulingRequest(BaseModel):
-    user_id: str
-    interview_type: str
-    preferred_dates: List[str]
-    timezone: str
 
-class MarketIntelligenceRequest(BaseModel):
-    job_title: str
-    location: str
-    industry: Optional[str] = None
 
 class ResumeInsightsRequest(BaseModel):
     resume_text: str
@@ -201,13 +168,7 @@ class ChatRequest(BaseModel):
     question: str
     user_context: Optional[Dict[str, Any]] = None
 
-class SchedulerSetupRequest(BaseModel):
-    user_id: str
-    schedule_type: str  # daily, weekly, monthly
-    search_criteria: Dict[str, Any]
 
-class SchedulerStatusRequest(BaseModel):
-    scheduler_id: str
 
 class ScheduleConfigRequest(BaseModel):
     user_id: str
@@ -239,7 +200,6 @@ async def health_check():
         services_status = {
             "crew_ai_service": crew_status,
             "job_aggregator": {"available": job_aggregator is not None},
-            "resume_parser": {"available": resume_parser is not None},
             "notification_service": {"available": notification_service is not None},
             "scheduler_agent": {"available": scheduler_agent is not None},
         }
@@ -448,6 +408,36 @@ async def match_jobs(request: MatchJobsRequest):
     return {"matches": rank_jobs(request.profile, jobs)}
 
 
+class ApplicationPackageRequest(BaseModel):
+    profile: Dict[str, Any]
+    job: Dict[str, Any]
+    questions: List[str] = []
+    provenance: Optional[Dict[str, str]] = None
+    applied_job_ids: List[str] = []
+
+
+@app.post("/ai/v2/applications/package")
+async def application_package(request: ApplicationPackageRequest):
+    """Prepare everything for one application from the caller's own profile. Nothing is sent
+    anywhere: the package is a proposal for the user to review, and submission is always click-out."""
+    from dataclasses import fields
+
+    from app.applications.package import build_package
+    from app.jobs.normalized import NormalizedJob
+
+    if len(request.questions) > 50 or len(json.dumps(request.profile, default=str)) > 200_000:
+        raise HTTPException(status_code=413, detail="Too many questions or profile too large")
+    allowed = {f.name for f in fields(NormalizedJob)}
+    try:
+        job = NormalizedJob(**{k: v for k, v in request.job.items() if k in allowed})
+    except TypeError as exc:
+        raise HTTPException(status_code=400, detail=f"Job is missing required fields: {exc}")
+    return build_package(
+        request.profile, job, questions=request.questions,
+        provenance=request.provenance, applied_job_ids=request.applied_job_ids,
+    )
+
+
 @app.get("/ai/v2/platforms/policies")
 async def platform_policies():
     from app.jobs.automation import POLICIES, Switches
@@ -523,57 +513,9 @@ async def chat_with_mentor(request: ChatRequest):
         logger.error(f"Error in chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/scheduler/setup")
-async def setup_scheduler(request: SchedulerSetupRequest):
-    """Setup automated job search scheduler"""
-    try:
-        scheduler_id = await _require(scheduler_agent, "scheduler").setup_scheduler(
-            request.user_id,
-            request.schedule_type,
-            request.search_criteria
-        )
-        
-        return JSONResponse(content={
-            "scheduler_id": scheduler_id,
-            "status": "setup_complete"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error setting up scheduler: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/scheduler/{scheduler_id}/status")
-async def get_scheduler_status(scheduler_id: str):
-    """Get scheduler status"""
-    try:
-        status = await _require(scheduler_agent, "scheduler").get_scheduler_status(scheduler_id)
-        return JSONResponse(content=status)
-        
-    except Exception as e:
-        logger.error(f"Error getting scheduler status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/scheduler/{scheduler_id}/run")
-async def run_scheduler(scheduler_id: str):
-    """Run a specific scheduler"""
-    try:
-        result = await _require(scheduler_agent, "scheduler").run_scheduler(scheduler_id)
-        return JSONResponse(content=result)
-        
-    except Exception as e:
-        logger.error(f"Error running scheduler: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/scheduler/{scheduler_id}")
-async def delete_scheduler(scheduler_id: str):
-    """Delete a scheduler"""
-    try:
-        success = await _require(scheduler_agent, "scheduler").delete_scheduler(scheduler_id)
-        return JSONResponse(content={"deleted": success})
-        
-    except Exception as e:
-        logger.error(f"Error deleting scheduler: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/search-jobs")
 async def search_jobs(request: JobSearchRequest):
@@ -639,85 +581,6 @@ async def get_job_matches(request: JobSearchRequest):
         logger.error(f"Error getting job matches: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/enhanced-job-matches")
-async def get_enhanced_job_matches(request: dict):
-    """Get enhanced AI-powered job matches with multiple algorithms"""
-    try:
-        # Extract user profile data
-        user_profile_data = request.get('userProfile', {})
-        available_jobs = request.get('availableJobs', [])
-        match_types = request.get('matchTypes', ['SKILLS_BASED', 'SEMANTIC_BASED', 'CAREER_GROWTH'])
-        limit = request.get('limit', 50)
-        
-        # Convert to UserProfile object (simplified)
-        from app.services.enhanced_job_matcher import UserProfile, MatchType
-        
-        user_profile = UserProfile(
-            user_id=user_profile_data.get('userId', ''),
-            skills=user_profile_data.get('skills', []),
-            experience_years=user_profile_data.get('experienceYears', 0),
-            education_level=user_profile_data.get('educationLevel', ''),
-            preferred_locations=user_profile_data.get('preferredLocations', []),
-            preferred_salary_range=tuple(user_profile_data.get('preferredSalaryRange', [0, 200000])),
-            career_goals=user_profile_data.get('careerGoals', []),
-            work_preferences=user_profile_data.get('workPreferences', {}),
-            resume_text=user_profile_data.get('resumeText', ''),
-            job_history=user_profile_data.get('jobHistory', []),
-            certifications=user_profile_data.get('certifications', []),
-            languages=user_profile_data.get('languages', []),
-            current_role=user_profile_data.get('currentRole')
-        )
-        
-        # Convert match types
-        match_type_enums = []
-        for match_type in match_types:
-            try:
-                match_type_enums.append(MatchType(match_type.lower()))
-            except ValueError:
-                continue
-        
-        # Get enhanced matches
-        matches = await _require(enhanced_job_matcher, "enhanced_job_matcher").find_matches(
-            user_profile=user_profile,
-            available_jobs=available_jobs,
-            match_types=match_type_enums,
-            limit=limit
-        )
-        
-        # Convert matches to serializable format
-        serializable_matches = []
-        for match in matches:
-            match_dict = {
-                'jobId': match.job_id,
-                'jobTitle': match.job_title,
-                'company': match.company,
-                'location': match.location,
-                'matchScore': match.match_score,
-                'confidence': match.confidence,
-                'matchReasons': match.match_reasons,
-                'missingSkills': match.missing_skills,
-                'growthPotential': match.growth_potential,
-                'salaryRange': match.salary_range,
-                'matchType': match.match_type.value if match.match_type else 'unknown',
-                'applicationDifficulty': match.application_difficulty,
-                'successProbability': match.success_probability,
-                'careerAdvancementScore': match.career_advancement_score,
-                'metadata': match.metadata
-            }
-            serializable_matches.append(match_dict)
-        
-        return {
-            "status": "success",
-            "totalMatches": len(serializable_matches),
-            "matches": serializable_matches,
-            "algorithmUsed": "enhanced_multi_algorithm",
-            "processingTime": "fast",
-            "confidence": "high"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in enhanced job matching: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/job-aggregator/search")
 async def job_aggregator_search(request: dict):
@@ -833,7 +696,7 @@ async def market_intelligence_insights(request: dict):
 
     try:
         # Use market intelligence service (heuristic-safe: see CrewAIService.get_market_intelligence)
-        raw_intel = await _require(market_intelligence, "market_intelligence").get_intelligence(job_title, location)
+        raw_intel = await _require(crew_ai_service, "crew_ai_service").get_market_intelligence(job_title, location)
     except HTTPException:
         raise
     except Exception as e:
@@ -1179,7 +1042,7 @@ async def career_mentor_chat(request: dict):
 
         # Use career mentor service (already has an honest heuristic fallback —
         # see CrewAIService.get_career_advice — when no LLM is configured).
-        response = await career_mentor.get_advice(message, {})
+        response = await _require(crew_ai_service, "crew_ai_service").get_career_advice(message, {})
 
         return {
             "status": "success",
@@ -1426,92 +1289,8 @@ async def get_career_advice(request: CareerAdviceRequest):
         logger.error(f"Error getting career advice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/schedule-interview")
-async def schedule_interview(request: SchedulingRequest):
-    """Schedule interview using AI agent"""
-    try:
-        result = await _require(scheduler_agent, "scheduler").schedule_interview(
-            user_id=request.user_id,
-            interview_type=request.interview_type,
-            preferred_dates=request.preferred_dates,
-            timezone=request.timezone
-        )
 
-        return JSONResponse(content=result)
 
-    except HTTPException:
-        # Preserve _require()'s 503 (dependency unavailable) instead of masking it
-        # as a 500 — the bare `except Exception` below was swallowing it.
-        raise
-    except Exception as e:
-        logger.error(f"Error scheduling interview: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/market-intelligence")
-async def get_market_intelligence(request: MarketIntelligenceRequest):
-    """Get market intelligence for job role.
-
-    NOTE: this older, more generic endpoint is not called by the frontend (which
-    uses the more specific /api/market-intelligence/insights,/salary,/skills,
-    /companies,/trends endpoints above) and isn't referenced by any Java backend
-    caller either — kept for backward compatibility with any external consumer,
-    left functionally as-is beyond the same 503-vs-500 fix applied elsewhere.
-    """
-    try:
-        # get_intelligence() only accepts (job_title, location) — request.industry
-        # has no effect here; this mirrors the pre-existing behavior of this
-        # catch-all endpoint (see market_intelligence.py) and is out of scope to
-        # change further since nothing currently calls this endpoint.
-        result = await _require(market_intelligence, "market_intelligence").get_intelligence(
-            job_title=request.job_title,
-            location=request.location,
-        )
-
-        return JSONResponse(content=result)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting market intelligence: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/platforms")
-async def get_available_platforms():
-    """Get list of available job platforms"""
-    return {
-        "platforms": [
-            {
-                "name": "LinkedIn",
-                "id": "linkedin",
-                "description": "Professional networking and job platform",
-                "features": ["Professional networking", "Company insights", "Salary information"]
-            },
-            {
-                "name": "Indeed",
-                "id": "indeed",
-                "description": "World's largest job site",
-                "features": ["Global job listings", "Salary data", "Company reviews"]
-            },
-            {
-                "name": "Naukri",
-                "id": "naukri",
-                "description": "Leading Indian job portal",
-                "features": ["Indian job market", "Regional focus", "Local companies"]
-            },
-            {
-                "name": "Glassdoor",
-                "id": "glassdoor",
-                "description": "Job search and company reviews",
-                "features": ["Company reviews", "Salary insights", "Interview experiences"]
-            },
-            {
-                "name": "Monster",
-                "id": "monster",
-                "description": "Global job search platform",
-                "features": ["Global reach", "Career resources", "Job alerts"]
-            }
-        ]
-    }
 
 @app.post("/api/schedule/job-search")
 async def create_job_search_schedule(request: ScheduleConfigRequest):
@@ -1539,15 +1318,15 @@ async def get_user_schedules(user_id: str):
         logger.error(f"Error getting user schedules: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/schedule/{schedule_id}/status")
-async def get_schedule_status(schedule_id: str):
-    """Backward-compatible schedule status endpoint."""
-    try:
-        status = await _require(scheduler_agent, "scheduler").get_scheduler_status(schedule_id)
-        return JSONResponse(content=status)
-    except Exception as e:
-        logger.error(f"Error getting schedule status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/schedule/{schedule_id}/run")
+async def run_schedule_now(schedule_id: str):
+    """Run a job-search schedule immediately and report how many jobs it found."""
+    result = await _require(scheduler_agent, "scheduler").run_now(schedule_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return JSONResponse(content=result)
+
 
 @app.post("/api/schedule/{schedule_id}/pause")
 async def pause_schedule(schedule_id: str):
@@ -1717,14 +1496,6 @@ def extract_skills_from_description(description: str) -> List[str]:
             found_skills.append(skill)
     return found_skills
 
-def calculate_match_score(keywords: List[str], job_skills: List[str]) -> int:
-    """Calculate job match score"""
-    if not keywords or not job_skills:
-        return 50
-    
-    matches = len(set([k.lower() for k in keywords]) & set([s.lower() for s in job_skills]))
-    total = len(keywords)
-    return min(int((matches / total) * 100), 100) if total > 0 else 50
 
 def extract_salary_number(salary_str: str) -> int:
     """Extract numeric salary for sorting"""

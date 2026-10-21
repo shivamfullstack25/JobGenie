@@ -42,7 +42,7 @@ class CandidateProfileServiceTest {
   @BeforeEach
   @SuppressWarnings("unchecked")
   void setUp() {
-    ProfileRepositories.Profiles profiles = mock(ProfileRepositories.Profiles.class);
+    CandidateProfileRepository profiles = mock(CandidateProfileRepository.class);
     when(profiles.findByUserId(anyLong()))
         .thenAnswer(call -> Optional.ofNullable(profileStore.get(call.<Long>getArgument(0))));
     when(profiles.save(any(CandidateProfile.class)))
@@ -53,7 +53,7 @@ class CandidateProfileServiceTest {
               return saved;
             });
 
-    ProfileRepositories.Versions versions = mock(ProfileRepositories.Versions.class);
+    ProfileVersionRepository versions = mock(ProfileVersionRepository.class);
     when(versions.save(any(ProfileVersion.class)))
         .thenAnswer(
             call -> {
@@ -77,7 +77,7 @@ class CandidateProfileServiceTest {
                     .sorted((a, b) -> b.getVersion() - a.getVersion())
                     .collect(Collectors.toList()));
 
-    ProfileRepositories.Proposals proposals = mock(ProfileRepositories.Proposals.class);
+    ProfileProposalRepository proposals = mock(ProfileProposalRepository.class);
     when(proposals.save(any(ProfileProposal.class)))
         .thenAnswer(
             call -> {

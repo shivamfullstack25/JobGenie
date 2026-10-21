@@ -1,36 +1,42 @@
+import {lazy, Suspense} from "react";
 import {Route, Switch} from "wouter";
 import {queryClient} from "./lib/queryClient";
 import {QueryClientProvider} from "@tanstack/react-query";
 import {Toaster} from "@/components/ui/toaster";
 import {TooltipProvider} from "@/components/ui/tooltip";
 import {ThemeProvider} from "@/components/theme-provider";
-import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
-import Dashboard from "@/pages/dashboard";
-import ResumeAssistant from "@/pages/resume-assistant";
-import JobMatches from "@/pages/job-matches";
-import CoverLetters from "@/pages/cover-letters";
-import ATSGenerator from "@/pages/ats-generator";
-import Notifications from "@/pages/notifications";
-import Preferences from "@/pages/preferences";
-import Automation from "@/pages/automation";
-import CareerMentor from "@/pages/career-mentor";
-import Profile from "@/pages/profile";
-import CandidateProfilePage from "@/pages/candidate-profile";
-import JobDiscovery from "@/pages/job-discovery";
-import MarketIntelligence from "@/pages/market-intelligence";
-import AdminPage from "@/pages/admin";
-import About from "@/pages/about";
-import Demo from "@/pages/demo";
-import JobAggregator from "@/pages/job-aggregator";
-import ApplicationHistory from "@/pages/application-history";
 import {ErrorBoundary} from '@/components/error-boundary';
 import { AuthProvider } from "./context/AuthContext";
-import Login from "@/pages/login";
-import Analytics from "@/pages/analytics";
+
+// Each page is loaded on demand, so the first visit downloads only the page being viewed
+// (plus shared code) instead of all twenty.
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Landing = lazy(() => import("@/pages/landing"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const ResumeAssistant = lazy(() => import("@/pages/resume-assistant"));
+const JobMatches = lazy(() => import("@/pages/job-matches"));
+const CoverLetters = lazy(() => import("@/pages/cover-letters"));
+const ATSGenerator = lazy(() => import("@/pages/ats-generator"));
+const Notifications = lazy(() => import("@/pages/notifications"));
+const Preferences = lazy(() => import("@/pages/preferences"));
+const Automation = lazy(() => import("@/pages/automation"));
+const CareerMentor = lazy(() => import("@/pages/career-mentor"));
+const Profile = lazy(() => import("@/pages/profile"));
+const CandidateProfilePage = lazy(() => import("@/pages/candidate-profile"));
+const JobDiscovery = lazy(() => import("@/pages/job-discovery"));
+const Approvals = lazy(() => import("@/pages/approvals"));
+const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
+const AdminPage = lazy(() => import("@/pages/admin"));
+const About = lazy(() => import("@/pages/about"));
+const Demo = lazy(() => import("@/pages/demo"));
+const JobAggregator = lazy(() => import("@/pages/job-aggregator"));
+const ApplicationHistory = lazy(() => import("@/pages/application-history"));
+const Login = lazy(() => import("@/pages/login"));
+const Analytics = lazy(() => import("@/pages/analytics"));
 
 function Router() {
   return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>}>
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
@@ -49,12 +55,14 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/candidate-profile" component={CandidateProfilePage} />
       <Route path="/job-discovery" component={JobDiscovery} />
+      <Route path="/approvals" component={Approvals} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/about" component={About} />
       <Route path="/demo" component={Demo} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 

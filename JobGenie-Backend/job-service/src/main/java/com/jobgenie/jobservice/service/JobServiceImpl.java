@@ -24,6 +24,7 @@ import com.jobgenie.jobservice.client.ResumeServiceClient;
 import com.jobgenie.jobservice.repository.JobApplicationRepository;
 import com.jobgenie.jobservice.repository.JobMatchRepository;
 import com.jobgenie.jobservice.repository.JobRepository;
+import com.jobgenie.jobservice.tracking.ApplicationTracker;
 import com.jobgenie.shared.dto.JobApplicationDto;
 import com.jobgenie.shared.dto.JobDto;
 import com.jobgenie.shared.dto.JobMatchDto;
@@ -49,6 +50,7 @@ public class JobServiceImpl implements JobService {
   private final JobMatchRepository jobMatchRepository;
   private final JobApplicationRepository jobApplicationRepository;
   private final ResumeServiceClient resumeServiceClient;
+  private final ApplicationTracker applicationTracker;
 
   /**
    * Without an explicit JSON Content-Type, RestTemplate's converter selection could pick
@@ -222,6 +224,7 @@ public class JobServiceImpl implements JobService {
               .build();
 
       JobApplication savedApplication = jobApplicationRepository.save(application);
+      applicationTracker.recordInitial(savedApplication, "user", "Logged as applied");
       return mapToJobApplicationDto(savedApplication);
     } catch (JobGenieException e) {
       throw e;
@@ -250,9 +253,6 @@ public class JobServiceImpl implements JobService {
     }
   }
 
-  private static final java.util.Set<String> VALID_APPLICATION_STATUSES =
-      java.util.Set.of("APPLIED", "INTERVIEWING", "OFFER", "REJECTED", "WITHDRAWN");
-
   @Override
   public JobApplicationDto updateApplicationStatus(Long applicationId, String userId, String status) {
     log.info(
@@ -260,75 +260,10 @@ public class JobServiceImpl implements JobService {
         applicationId,
         userId,
         status);
-
-    String normalizedStatus = status == null ? null : status.trim().toUpperCase();
-    if (!VALID_APPLICATION_STATUSES.contains(normalizedStatus)) {
-      throw new JobGenieException(
-          "Invalid status. Must be one of: " + VALID_APPLICATION_STATUSES, "INVALID_STATUS", 400);
-    }
-
-    JobApplication application =
-        jobApplicationRepository
-            .findById(applicationId)
-            .orElseThrow(
-                () ->
-                    new JobGenieException(
-                        "Application not found: " + applicationId,
-                        "APPLICATION_NOT_FOUND",
-                        404));
-
-    if (!application.getUserId().equals(userId)) {
-      throw new JobGenieException(
-          "Application does not belong to this user", "APPLICATION_ACCESS_DENIED", 403);
-    }
-
-    application.setStatus(normalizedStatus);
-    JobApplication updated = jobApplicationRepository.save(application);
-    return mapToJobApplicationDto(updated);
-  }
-
-  @Override
-  public Map<String, Object> startAutomation(String userId, Map<String, Object> config) {
-    try {
-      log.info("Starting automation for userId: {}", userId);
-
-      Map<String, Object> request = new HashMap<>();
-      request.put("user_id", userId);
-      request.put("schedule_type", "daily");
-      request.put("search_criteria", config);
-
-      ResponseEntity<Map> response = postJson(aiServiceUrl + "/api/scheduler/setup", request);
-
-      if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-        return response.getBody();
-      }
-    } catch (Exception e) {
-      log.error("Failed to start automation: {}", e.getMessage(), e);
-      throw new JobGenieException(
-          "Failed to start automation: " + e.getMessage(), "AUTOMATION_START_ERROR");
-    }
-
-    throw new JobGenieException("Automation setup failed", "AUTOMATION_SETUP_FAILED");
-  }
-
-  @Override
-  public Map<String, Object> getAutomationStatus(String userId) {
-    try {
-      log.info("Getting automation status for userId: {}", userId);
-
-      ResponseEntity<Map> response =
-          restTemplate.getForEntity(aiServiceUrl + "/api/schedule/user/" + userId, Map.class);
-
-      if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-        return response.getBody();
-      }
-    } catch (Exception e) {
-      log.error("Failed to get automation status: {}", e.getMessage(), e);
-      throw new JobGenieException(
-          "Failed to get automation status: " + e.getMessage(), "AUTOMATION_STATUS_ERROR");
-    }
-
-    throw new JobGenieException("Automation status not available", "AUTOMATION_STATUS_UNAVAILABLE");
+    // Validation, the ownership check, the state-machine rules and the transition log all live in
+    // ApplicationTracker so there is exactly one way an application's state can change.
+    return mapToJobApplicationDto(
+        applicationTracker.transition(applicationId, userId, status, "user", "Status updated"));
   }
 
   @Override

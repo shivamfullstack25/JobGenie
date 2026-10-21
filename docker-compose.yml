@@ -225,9 +225,8 @@ services:
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:?INTERNAL_AUTH_SECRET must be set in .env - see .env.example}
       USER_SERVICE_URL: http://user-service:8081
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-      # Core AI Configuration — Groq (free) tried first, then Gemini (free
-      # tier), then paid OpenAI — see crew_ai_service.py's select_llm() for
-      # the full cost-ascending priority chain.
+
+      # LLM: Groq (free) -> Gemini (free tier) -> OpenAI (paid) -> Ollama -> rules only.
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
@@ -237,84 +236,32 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.7}
 
-      # Job listings — Adzuna (licensed, free tier) used when configured, else
-      # falls back to the cached scraper path. See CLAUDE.md "Product decisions
-      # (locked)".
+      # Jobs: licensed Adzuna API, and public ATS boards (platform:token, comma-separated).
       ADZUNA_APP_ID: ${ADZUNA_APP_ID}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
-
-      # Job boards to search (public ATS feeds): comma-separated platform:token[:Company Name],
-      # e.g. greenhouse:stripe,lever:netflix. See docs/platform-compliance.md for what is permitted.
       JOB_BOARDS: ${JOB_BOARDS:-}
+
       # Automation kill switches. Safe defaults: nothing runs unattended, nothing is ever submitted.
       GLOBAL_AUTOMATION_ENABLED: ${GLOBAL_AUTOMATION_ENABLED:-false}
       DRY_RUN: ${DRY_RUN:-true}
       DISABLED_PLATFORMS: ${DISABLED_PLATFORMS:-}
 
-      # AI Service Features
-      ENABLE_VECTOR_STORAGE: ${ENABLE_VECTOR_STORAGE:-false}
-      ENABLE_MEMORY: ${ENABLE_MEMORY:-true}
-      ENABLE_STREAMING: ${ENABLE_STREAMING:-true}
-      
-      # Vector Database
-      VECTOR_DB_TYPE: ${VECTOR_DB_TYPE:-chromadb}
-      VECTOR_DB_PATH: ${VECTOR_DB_PATH:-/app/data/vectordb}
-      VECTOR_STORE_PERSIST_DIR: ${VECTOR_STORE_PERSIST_DIR:-/app/vector_db}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-ada-002}
-      VECTOR_DIMENSION: ${VECTOR_DIMENSION:-1536}
-      
-      # Memory Management
-      MEMORY_PROVIDER: ${MEMORY_PROVIDER:-redis}
-      MEMORY_TTL: ${MEMORY_TTL:-3600}
-      MEMORY_K: ${MEMORY_K:-10}
-      CONTEXT_WINDOW: ${CONTEXT_WINDOW:-4000}
-      MAX_CONTEXT_LENGTH: ${MAX_CONTEXT_LENGTH:-4000}
-      
-      # Database and Redis
-      POSTGRES_URL: ${POSTGRES_URL:-postgresql://jobgenie_user:jobgenie_pass@postgres:5432/jobgenie_ai}
+      # Cache and service discovery
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      
-      # Service Discovery
       EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
-      SERVICE_NAME: ${SERVICE_NAME:-ai-service}
+      SERVICE_HOST: ai-service
       SERVICE_PORT: ${SERVICE_PORT:-8000}
-      
-      # Firebase Configuration
-      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
-      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
-      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
-      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
-      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
-      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
-      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID}
-      
-      # Email Configuration
-      MAIL_USER: ${MAIL_USER}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      MAIL_HOST: ${MAIL_HOST}
-      MAIL_PORT: ${MAIL_PORT}
-      
-      # Advanced Features
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
-      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED:-true}
-      ENABLE_PERFORMANCE_MONITORING: ${ENABLE_PERFORMANCE_MONITORING:-true}
-      ENABLE_REAL_TIME_ANALYTICS: ${ENABLE_REAL_TIME_ANALYTICS:-true}
-      
-      # Security and Performance
-      RATE_LIMIT_REPLENISH: ${RATE_LIMIT_REPLENISH:-10}
-      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
-      JOB_SEARCH_MAX_RESULTS: ${JOB_SEARCH_MAX_RESULTS:-50}
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10MB}
-      
-      # Logging
+
+      # Email for scheduled-search notifications (SendGrid, else SMTP; both optional).
+      # The code reads SMTP_*; these were previously passed as MAIL_* and never reached it.
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      SMTP_SERVER: ${MAIL_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${MAIL_PORT:-587}
+      SMTP_USERNAME: ${MAIL_USER:-}
+      SMTP_PASSWORD: ${MAIL_PASSWORD:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
-      
-      # Development
-      DEBUG: ${DEBUG:-false}
-      RELOAD: ${RELOAD:-false}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -328,11 +275,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
-    volumes:
-      - ai-data:/app/vector_db
-      - ai-logs:/app/logs
-      - ai-cache:/app/cache
-      - ai-vectordb:/app/data/vectordb
     networks:
       - jobgenie-network
 
@@ -386,11 +328,9 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
-        VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8000}
     restart: always
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
-      VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8000}
     ports:
       - "3000:80"
     depends_on:
@@ -408,10 +348,6 @@ services:
 volumes:
   pgdata:
   maven-cache:
-  ai-data:
-  ai-logs:
-  ai-cache:
-  ai-vectordb:
 
 networks:
   jobgenie-network:

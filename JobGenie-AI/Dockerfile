@@ -1,9 +1,8 @@
-# Use Python 3.11 with a more complete base image
 FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# System deps (retry apt on transient network failures)
+# curl for the health check; gcc/g++ only for wheels that need compiling.
 RUN for i in 1 2 3 4 5; do \
       apt-get update --fix-missing && \
       apt-get install -y --no-install-recommends gcc g++ curl ca-certificates && \
@@ -11,32 +10,23 @@ RUN for i in 1 2 3 4 5; do \
     done && \
     rm -rf /var/lib/apt/lists/*
 
-# Lean requirements for reliable Docker builds (full stack in requirements.txt for local dev)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
 COPY requirements-docker.txt .
-
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONPATH=/app
-
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-docker.txt
 
-# Create data directories
-RUN mkdir -p /app/vector_db /app/data /app/logs /app/cache
+COPY main.py .
+COPY app ./app
 
-# Copy application code
-COPY . .
-
-RUN chmod +x startup.sh && \
-    chmod -R 755 /app/vector_db /app/data /app/logs /app/cache
-
-RUN useradd -m -u 1000 jobgenie && \
-    chown -R jobgenie:jobgenie /app
+RUN useradd -m -u 1000 jobgenie && chown -R jobgenie:jobgenie /app
 USER jobgenie
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["./startup.sh"]
+CMD ["sh", "-c", "exec python -m uvicorn main:app --host 0.0.0.0 --port ${SERVICE_PORT:-8000} --log-level $(echo ${LOG_LEVEL:-info} | tr A-Z a-z)"]

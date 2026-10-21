@@ -46,7 +46,7 @@ import {
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Cropper from 'react-easy-crop';
-import { Modal, Box, Slider } from '@mui/material';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import getCroppedImg from '../utils/cropImage';
 import { useAuth } from "../context/AuthContext";
 
@@ -458,8 +458,11 @@ export default function Profile() {
                     </div>
                   </div>
                 </div>
-                <Modal open={cropModalOpen} onClose={() => setCropModalOpen(false)}>
-                  <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, bgcolor: 'background.paper', boxShadow: 24, p: 4 }}>
+                <Dialog open={cropModalOpen} onOpenChange={setCropModalOpen}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Crop photo</DialogTitle>
+                    </DialogHeader>
                     {selectedImage && (
                       <>
                         <div style={{ position: 'relative', width: '100%', height: 300, background: '#333' }}>
@@ -473,19 +476,21 @@ export default function Profile() {
                             onCropComplete={onCropComplete}
                           />
                         </div>
-                        <Slider
+                        <input
+                          type="range"
+                          aria-label="Zoom"
+                          className="mt-4 w-full"
                           value={zoom}
                           min={1}
                           max={3}
                           step={0.1}
-                          onChange={(_, value) => setZoom(value as number)}
-                          sx={{ mt: 2 }}
+                          onChange={(e) => setZoom(Number(e.target.value))}
                         />
                         <Button onClick={handleCropSave} className="mt-4 w-full">Save</Button>
                       </>
                     )}
-                  </Box>
-                </Modal>
+                  </DialogContent>
+                </Dialog>
 
                 <Separator className="dark:bg-gray-700" />
 

@@ -28,11 +28,6 @@ public interface JobService {
   com.jobgenie.shared.dto.JobApplicationDto updateApplicationStatus(
       Long applicationId, String userId, String status);
 
-  java.util.Map<String, Object> startAutomation(
-      String userId, java.util.Map<String, Object> config);
-
-  java.util.Map<String, Object> getAutomationStatus(String userId);
-
   long getJobMatchesCount();
 
   long getJobApplicationsCount();

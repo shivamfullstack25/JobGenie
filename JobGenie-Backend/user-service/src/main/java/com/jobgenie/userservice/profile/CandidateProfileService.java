@@ -72,9 +72,9 @@ public class CandidateProfileService {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private final ProfileRepositories.Profiles profiles;
-  private final ProfileRepositories.Versions versions;
-  private final ProfileRepositories.Proposals proposals;
+  private final CandidateProfileRepository profiles;
+  private final ProfileVersionRepository versions;
+  private final ProfileProposalRepository proposals;
   private final AuditLogRepository auditLogs;
 
   // ------------------------------------------------------------------ reads

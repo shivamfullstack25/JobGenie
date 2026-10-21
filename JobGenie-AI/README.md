@@ -1,69 +1,18 @@
-# JobGenie-AI
+# JobGenie AI service
 
-## LLM Selection and Fallback
+FastAPI service for resume analysis, job intelligence and application packages. It holds no
+durable data: the Spring services own all records and call this service with signed requests
+(see `app/core/internal_auth.py`).
 
-JobGenie-AI supports dynamic selection and fallback for Large Language Models (LLMs). You can use OpenAI (cloud), Ollama (local open-source), or Mistral (local open-source). The system will try your preferred provider, and if unavailable, will gracefully fallback to the next available option.
+| Area | Code | Endpoints |
+|---|---|---|
+| Resume parse / ATS / cover letter / career chat | `app/services/crew_ai_service.py` (LLM, with rule-based fallback) | `/ai/resume/analyze`, `/api/resume-insights`, `/api/ats-resume`, `/api/generate-cover-letter`, `/api/chat` |
+| Role-specific resumes (cannot invent) | `app/agents/resume_agent.py` | `/ai/v2/resume/*` |
+| Job discovery, dedup, safety, matching, platform policy | `app/jobs/` | `/ai/v2/jobs/*`, `/ai/v2/platforms/policies` |
+| Application packages and decisions | `app/applications/` | `/ai/v2/applications/package` |
+| Legacy search (Adzuna + cached scrapers) | `app/services/job_aggregator.py` | `/api/search-jobs`, `/api/job-matches`, `/api/job-aggregator/*` |
+| Scheduled searches, notifications | `app/services/scheduler_agent.py`, `notification_service.py` | `/api/schedule/*`, `/api/notifications/*` |
 
-### Configuration
+LLM provider order with `LLM_PROVIDER=auto`: Groq → Gemini → OpenAI → Ollama → rules only.
 
-Set the following variables in your `.env` file:
-
-```
-# OpenAI API Key (if using OpenAI)
-OPENAI_API_KEY=your-openai-key
-
-# LLM Provider Selection
-# Options: openai, ollama, mistral, auto (auto = try OpenAI, then Ollama, then Mistral)
-LLM_PROVIDER=auto
-
-# LLM Model (for OpenAI or open-source)
-LLM_MODEL=gpt-4
-LLM_TEMPERATURE=0.7
-
-# Ollama (open-source LLM) configuration
-OLLAMA_URL=http://localhost:11434
-
-# Mistral (open-source LLM) configuration
-MISTRAL_URL=http://localhost:8080
-```
-
-- If `LLM_PROVIDER=auto`, the system will try OpenAI first (if `OPENAI_API_KEY` is set), then Ollama, then Mistral.
-- If you want to force a specific provider, set `LLM_PROVIDER` to `openai`, `ollama`, or `mistral`.
-- Make sure the corresponding service (Ollama or Mistral) is running if you select them.
-
-### Troubleshooting
-- If no LLM is available, the service will log an error and fail to start.
-- Check your API keys and that local LLM services are running on the correct ports.
-- Logs will indicate which LLM provider is being used or if a fallback occurred. 
-
-## Testing LLM Fallback Logic
-
-You can test the LLM fallback logic by changing your `.env` and service availability:
-
-### 1. OpenAI Available
-- Set `OPENAI_API_KEY` and `LLM_PROVIDER=auto` (or `openai`).
-- Start the service. It should use OpenAI (see logs: `Using OpenAI LLM`).
-
-### 2. OpenAI Unavailable, Ollama Running
-- Remove or comment out `OPENAI_API_KEY`.
-- Start Ollama (`ollama serve`), set `LLM_PROVIDER=auto` (or `ollama`).
-- Start the service. It should use Ollama (see logs: `Using Ollama LLM`).
-
-### 3. Only Mistral Running
-- Remove `OPENAI_API_KEY` and stop Ollama.
-- Start Mistral (see docs for running Mistral server), set `LLM_PROVIDER=auto` (or `mistral`).
-- Start the service. It should use Mistral (see logs: `Using Mistral LLM`).
-
-### 4. No LLM Available
-- If no provider is available, the service will log an error and fail to start.
-
-**Check logs for lines like:**
-- `Using OpenAI LLM: gpt-4`
-- `Using Ollama LLM (open-source) at http://localhost:11434`
-- `Using Mistral LLM (open-source) at http://localhost:8080`
-- `No available LLM provider could be initialized. Please check your configuration.`
-
-**Troubleshooting:**
-- Ensure the correct ports and URLs are set in `.env`.
-- Ensure the required Python packages for open-source LLMs are installed (`langchain_community`).
-- Check for typos in `.env` variable names. 
+Tests: `pip install -r requirements-dev.txt && python -m pytest tests -q`

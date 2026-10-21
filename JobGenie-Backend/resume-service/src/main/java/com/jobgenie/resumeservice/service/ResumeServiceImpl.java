@@ -216,8 +216,9 @@ public class ResumeServiceImpl implements ResumeService {
     try {
       log.info("Processing resume with AI for resumeId: {}", resume.getId());
 
-      Map<String, Object> metadata = aiServiceClient.extractMetadata(resume.getContent());
-      Map<String, Object> insights = aiServiceClient.generateInsights(resume.getContent());
+      AIServiceUtil.Analysis analysis = aiServiceClient.analyze(resume.getContent());
+      Map<String, Object> metadata = analysis.getMetadata();
+      Map<String, Object> insights = analysis.getInsights();
 
       resume.setMetadata(metadata);
       resume.setInsights(insights);

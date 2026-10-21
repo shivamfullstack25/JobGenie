@@ -12,9 +12,7 @@ COPY . .
 
 # Bake API URLs into the static build (Vite reads VITE_* at build time)
 ARG VITE_API_BASE_URL=http://localhost:8080
-ARG VITE_AI_SERVICE_URL=http://localhost:8000
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_AI_SERVICE_URL=$VITE_AI_SERVICE_URL
 
 RUN npm run build
 

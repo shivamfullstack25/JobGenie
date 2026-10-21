@@ -153,6 +153,7 @@ public class GatewayRoutesConfig {
         .route("profile-alias", r -> r.path("/api/profile/**").uri("lb://user-service"))
         .route("resume-service", r -> r.path("/api/resumes/**").uri("lb://resume-service"))
         .route("job-service", r -> r.path("/api/jobs/**").uri("lb://job-service"))
+        .route("approvals", r -> r.path("/api/approvals/**").uri("lb://job-service"))
 
         // ==================================================
         // GATEWAY-LOCAL ROUTES (admin, analytics, gateway stats)

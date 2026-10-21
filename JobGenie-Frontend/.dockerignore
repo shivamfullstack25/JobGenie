@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+src/**/*.test.ts
+src/**/*.test.tsx
+src/__tests__/
+*.md

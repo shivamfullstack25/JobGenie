@@ -56,8 +56,7 @@ public class GatewayAuthFilter implements WebFilter, Ordered {
           Pattern.compile("^/api/auth/(verify|refresh)$"),
           Pattern.compile("^/swagger-ui(/.*|\\.html)?$"),
           Pattern.compile("^/v3/api-docs(/.*)?$"),
-          Pattern.compile("^/webjars/.*$"),
-          Pattern.compile("^/api/docs(/.*)?$"));
+          Pattern.compile("^/webjars/.*$"));
 
   private static final List<Pattern> ADMIN_ONLY_PATHS =
       List.of(

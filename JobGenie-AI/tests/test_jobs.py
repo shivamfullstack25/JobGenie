@@ -376,3 +376,20 @@ def test_high_risk_jobs_are_shown_but_never_matched_for_automation():
     entry = run(discovery.discover([], profile=PROFILE))["jobs"][0]
 
     assert entry["safety"]["level"] == "HIGH" and entry["match"] is None
+
+
+def test_experience_is_counted_to_the_month_without_double_counting():
+    from datetime import date
+
+    from app.jobs.matching import profile_years
+
+    today = date(2026, 10, 21)
+    realistic = {"experience": [
+        {"start": "Nov 2020", "end": "Jun 2026"},
+        {"start": "Jul 2026", "end": "Present"},
+    ]}
+    assert profile_years(realistic, today) == pytest.approx(6.0, abs=0.01)  # 68 + 4 months
+    overlapping = {"experience": [{"start": "Jan 2020", "end": "Dec 2022"}, {"start": "Jun 2021", "end": "Dec 2021"}]}
+    assert profile_years(overlapping, today) == pytest.approx(3.0)
+    assert profile_years({"experience": [{"start": "2020", "end": "2099"}]}, today) == pytest.approx((2026 * 12 + 10 - (2020 * 12 + 1) + 1) / 12)
+    assert profile_years({"experience": [{"company": "X"}]}, today) is None
